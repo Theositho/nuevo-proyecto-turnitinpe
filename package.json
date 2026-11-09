@@ -1,0 +1,21 @@
+{
+  "name": "turnitinpe-academic-platform",
+  "private": true,
+  "version": "2.0.0",
+  "description": "Plataforma académica profesional TurnitinPE · Gestión de Cursos, Turnitin Feedback Studio, Originality, Laboratorio de IA, QuillBot y Administración Comercial",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 5173",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 5173"
+  },
+  "dependencies": {
+    "lucide-react": "^0.460.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.3",
+    "vite": "^5.4.11"
+  }
+}
