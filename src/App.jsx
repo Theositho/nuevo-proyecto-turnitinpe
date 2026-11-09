@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import {
   LayoutDashboard,
-  GraduationCap,
   FileCheck2,
   FolderLock,
   Sparkles,
@@ -18,31 +17,28 @@ import {
   Search,
   Plus,
   CheckCircle2,
-  AlertCircle,
   Download,
   Eye,
   RefreshCw,
   Smartphone,
   MessageCircle,
   ShieldCheck,
-  Terminal,
   Copy,
   Menu,
   X,
-  BookOpen,
   Sliders,
   Send,
-  Trash2,
   KeyRound,
-  Award,
-  Layers,
+  HardDrive,
+  FileText,
+  Trash2,
 } from 'lucide-react';
 import {
   SEED_ADMIN_USER,
-  SEED_COURSES,
   SEED_SERVICES,
   SEED_PLANS,
   SEED_JOBS,
+  SEED_CLIENT_UPLOADS,
   SEED_USERS,
   SEED_AI_MODELS,
   SEED_BINDINGS,
@@ -102,28 +98,24 @@ export default function App() {
   const [loginEmail, setLoginEmail] = useState('saraviarosquetecomeverga@chivo.com');
   const [loginPassword, setLoginPassword] = useState('yacache@123456');
   const [loginBusy, setLoginBusy] = useState(false);
-  const [loginError, setLoginError] = useState('');
 
   // Core data states
-  const [courses, setCourses] = useState(SEED_COURSES);
-  const [selectedCourseId, setSelectedCourseId] = useState('course-tesis-posgrado');
   const [jobs, setJobs] = useState(SEED_JOBS);
   const [users, setUsers] = useState(SEED_USERS);
   const [plans, setPlans] = useState(SEED_PLANS);
-  const [bindings, setBindings] = useState(SEED_BINDINGS);
+  const [bindings] = useState(SEED_BINDINGS);
+  const [clientUploads] = useState(SEED_CLIENT_UPLOADS);
   const [auditLogs, setAuditLogs] = useState(SEED_AUDIT);
 
   // Filters & search
   const [jobSearch, setJobSearch] = useState('');
-  const [jobCourseFilter, setJobCourseFilter] = useState('all');
+  const [jobKindFilter, setJobKindFilter] = useState('all');
   const [userFilter, setUserFilter] = useState('all');
   const [userSearch, setUserSearch] = useState('');
 
-  // Upload studio state
+  // Upload studio state (Turnitin Feedback & Originality)
   const [uploadFileName, setUploadFileName] = useState('');
-  const [uploadAuthor, setUploadAuthor] = useState('');
-  const [uploadCourseCode, setUploadCourseCode] = useState('POS-2026-II');
-  const [uploadKinds, setUploadKinds] = useState(['ai', 'similarity']);
+  const [uploadReportMode, setUploadReportMode] = useState('both'); // 'both' | 'similarity' | 'ai'
   const [excludeBib, setExcludeBib] = useState(true);
   const [excludeQuotes, setExcludeQuotes] = useState(true);
   const [excludeSmallWords, setExcludeSmallWords] = useState(true);
@@ -132,7 +124,6 @@ export default function App() {
 
   // Modals state
   const [selectedJobForReport, setSelectedJobForReport] = useState(null);
-  const [showNewCourseModal, setShowNewCourseModal] = useState(false);
   const [showNewUserModal, setShowNewUserModal] = useState(false);
   const [showNewPlanModal, setShowNewPlanModal] = useState(false);
   const [generatedToken, setGeneratedToken] = useState('');
@@ -140,33 +131,23 @@ export default function App() {
 
   // AI Studio state
   const [selectedAiModel, setSelectedAiModel] = useState(SEED_AI_MODELS[0].model);
-  const [aiUsedToday, setAiUsedToday] = useState(4);
+  const [aiUsedToday, setAiUsedToday] = useState(0);
   const [chatInput, setChatInput] = useState('');
   const [chatMessages, setChatMessages] = useState([
     {
       role: 'assistant',
-      text: '¡Bienvenido al Laboratorio Académico de IA de TurnitinPE! Selecciona un modelo especializado o utiliza las plantillas inferiores para redactar tu marco teórico, parafrasear con normas APA 7ma edición o interpretar tablas estadísticas SPSS.',
+      text: '¡Bienvenido a Todas las IA de turnitinpe! Utiliza este asistente para reformular fragmentos con coincidencias, disminuir el porcentaje de detección de IA o revisar la redacción de tu documento antes de volver a analizarlo.',
     },
   ]);
 
-  // QuillBot Interactive state
+  // QuillBot state
   const [qbInput, setQbInput] = useState(
-    'El presente estudio tiene como objetivo determinar la relación entre la transformación digital y la gestión administrativa en las municipalidades provinciales durante el periodo 2026.'
+    'El presente documento analiza los indicadores de gestión y su impacto directo en la optimización de procesos durante el ejercicio 2026.'
   );
   const [qbMode, setQbMode] = useState('academic');
   const [qbOutput, setQbOutput] = useState(
-    'La presente investigación examina el vínculo existente entre los procesos de modernización digital y la eficiencia de la gestión pública en los gobiernos locales provinciales durante el ejercicio 2026 (APA 7ma ed.).'
+    'Este informe examina las métricas operativas y su incidencia en la mejora continua de los procedimientos institucionales durante el periodo 2026.'
   );
-
-  // New Course form state
-  const [newCourseForm, setNewCourseForm] = useState({
-    code: 'DOC-2026-III',
-    title: '',
-    institution: 'Escuela de Posgrado',
-    instructor: 'Dr. Saravia · Instructor Oficial',
-    maxSimilarityThreshold: 15,
-    maxAiThreshold: 15,
-  });
 
   // New User form state
   const [newUserForm, setNewUserForm] = useState({
@@ -189,7 +170,7 @@ export default function App() {
     setToast(message);
     setTimeout(() => {
       setToast((prev) => (prev === message ? null : prev));
-    }, 3600);
+    }, 3500);
   };
 
   const toggleTheme = () => {
@@ -201,29 +182,7 @@ export default function App() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoginBusy(true);
-    setLoginError('');
     try {
-      // Try live API first if reachable, fallback to local state seamlessly
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
-      }).catch(() => null);
-
-      if (res && res.ok) {
-        const data = await res.json();
-        if (data?.user) {
-          setUser(data.user);
-          setViewMode(data.user.role === 'admin' ? 'admin' : 'member');
-          showNotification(`Bienvenido de nuevo, ${data.user.name}`);
-          setLoginBusy(false);
-          return;
-        }
-      }
-
       const matched = users.find(
         (u) => u.email.toLowerCase() === loginEmail.trim().toLowerCase()
       );
@@ -237,14 +196,14 @@ export default function App() {
       } else if (matched) {
         setUser(matched);
         setViewMode(matched.role === 'admin' ? 'admin' : 'member');
-        showNotification(`Sesión iniciada como ${matched.name}`);
+        showNotification(`Bienvenido de nuevo, ${matched.name}`);
       } else {
         setUser({
           ...SEED_ADMIN_USER,
-          name: loginEmail.split('@')[0] || 'Investigador',
+          name: loginEmail.split('@')[0] || 'Usuario',
           email: loginEmail,
         });
-        showNotification('Sesión iniciada en tu espacio académico');
+        showNotification('Sesión iniciada en turnitinpe');
       }
     } finally {
       setLoginBusy(false);
@@ -253,38 +212,47 @@ export default function App() {
 
   const handleFileUploadSubmit = (e) => {
     e.preventDefault();
-    const chosenName =
-      uploadFileName.trim() || 'Tesis_Maestria_Gestion_Publica_2026_Revisado.pdf';
+    const chosenName = uploadFileName.trim() || 'Documento_Revision_Turnitin_2026.pdf';
     setIsUploading(true);
 
     setTimeout(() => {
-      const nextCode = String(13913 + jobs.length);
-      const simScore = Math.floor(Math.random() * 11) + 4; // 4% - 14%
+      const nextCode = String(13913 + jobs.length - SEED_JOBS.length);
+      const simScore = Math.floor(Math.random() * 11) + 4;
       const aiScore = Math.random() > 0.45 ? 0 : Math.floor(Math.random() * 7) + 2;
+      const kinds =
+        uploadReportMode === 'both'
+          ? ['ai', 'similarity']
+          : uploadReportMode === 'ai'
+          ? ['ai']
+          : ['similarity'];
+
       const newJob = {
         id: `job-${Date.now()}`,
         displayCode: nextCode,
         name: chosenName,
-        courseCode: uploadCourseCode,
-        author: uploadAuthor.trim() || user.name,
         ownerName: user.name,
         ownerEmail: user.email,
-        sizeBytes: 1624100,
-        pages: 64,
-        words: 15820,
-        kinds: uploadKinds,
+        provider: 'originalityplus',
+        sizeBytes: 1542100,
+        pages: 58,
+        words: 14820,
+        kinds,
         state: 'completed',
         similarityScore: simScore,
         aiScore,
         createdAt: new Date().toISOString(),
         completedAt: new Date().toISOString(),
+        reportNames: {
+          ai: `ai-${nextCode}.pdf`,
+          similarity: `sim-${nextCode}.pdf`,
+        },
         reportStates: {
           ai: { state: 'completed', attempt: 1 },
           similarity: { state: 'completed', attempt: 1 },
         },
         sources: [
-          { source: 'repositorio.pucp.edu.pe (Tesis de Posgrado)', percent: '4%' },
-          { source: 'scielo.org.pe (Revista Científica)', percent: '3%' },
+          { source: 'repositorio.pucp.edu.pe (Repositorio Institucional)', percent: '4%' },
+          { source: 'scielo.org.pe (Artículo Científico)', percent: '3%' },
           { source: 'alicia.concytec.gob.pe', percent: '2%' },
         ],
       };
@@ -295,7 +263,7 @@ export default function App() {
           id: `aud-${Date.now()}`,
           actorName: user.name,
           actorRole: viewMode,
-          action: `Procesó documento en aula ${uploadCourseCode} (#${nextCode})`,
+          action: `Envió documento #${nextCode} (${kinds.join(' + ').toUpperCase()})`,
           target: chosenName,
           createdAt: new Date().toISOString(),
         },
@@ -303,99 +271,54 @@ export default function App() {
       ]);
       setIsUploading(false);
       setUploadFileName('');
-      setUploadAuthor('');
       showNotification(
-        `¡Informe #${nextCode} generado! Similitud: ${simScore}% · IA: ${aiScore}%`
+        `¡Reporte #${nextCode} listo! Similitud: ${simScore}% · Detección IA: ${aiScore}%`
       );
       setSelectedJobForReport(newJob);
-    }, 900);
+    }, 850);
   };
 
   const handleDownloadCertificate = (job, type = 'similarity') => {
     const content = [
       '====================================================================',
-      '        TURNITINPE · CERTIFICADO OFICIAL DE INTEGRIDAD ACADÉMICA     ',
+      '          TURNITINPE · REPORTE OFICIAL DE IA Y SIMILITUD            ',
       '====================================================================',
-      `Código de Entrega : #${job.displayCode}`,
+      `Código de Trabajo : #${job.displayCode}`,
       `Documento         : ${job.name}`,
-      `Autor / Tesista   : ${job.author || job.ownerName}`,
-      `Curso / Aula      : ${job.courseCode || 'POS-2026-II'} (Sin Depósito / No Repository)`,
-      `Fecha de Emisión  : ${new Date(job.createdAt).toLocaleString('es-PE')}`,
+      `Usuario / Cliente : ${job.ownerName} (${job.ownerEmail})`,
+      `Proveedor         : OriginalityPlus · Sin Depósito (No Repository)`,
+      `Fecha en Lima     : ${new Date(job.createdAt).toLocaleString('es-PE')}`,
       '--------------------------------------------------------------------',
-      `ÍNDICE DE SIMILITUD GENERAL : ${job.similarityScore}%`,
-      `ESCRITURA POR IA DETECTADA  : ${job.aiScore}%`,
-      `TIPO DE CERTIFICADO         : ${
-        type === 'ai' ? 'Detección de Escritura IA' : 'Informe de Originalidad y Similitud'
+      `PORCENTAJE DE SIMILITUD     : ${job.similarityScore}%`,
+      `PORCENTAJE DE DETECCIÓN IA  : ${job.aiScore}%`,
+      `ARCHIVO DESCARGADO          : ${
+        type === 'ai'
+          ? job.reportNames?.ai || `ai-${job.displayCode}.pdf`
+          : job.reportNames?.similarity || `sim-${job.displayCode}.pdf`
       }`,
       '--------------------------------------------------------------------',
-      'FUENTES PRINCIPALES IDENTIFICADAS:',
+      'FUENTES PRINCIPALES DETECTADAS:',
       ...(job.sources || []).map((s, idx) => `  [${idx + 1}] ${s.source} — ${s.percent}`),
-      '--------------------------------------------------------------------',
-      'Verificado por Estación TurnitinPE OriginalityPlus · Lima, Perú.',
+      '====================================================================',
     ].join('\n');
 
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Certificado_Turnitin_${type.toUpperCase()}_${job.displayCode}.txt`;
+    a.download = `Reporte_Turnitin_${type.toUpperCase()}_${job.displayCode}.txt`;
     a.click();
     URL.revokeObjectURL(url);
     showNotification(
-      `Descargando certificado ${type === 'ai' ? 'de IA' : 'de Similitud'} (#${job.displayCode})`
+      `Descargando PDF de ${type === 'ai' ? 'Detección de IA' : 'Similitud'} (#${job.displayCode})`
     );
-  };
-
-  const handleCreateCourse = (e) => {
-    e.preventDefault();
-    if (!newCourseForm.title.trim()) return;
-    const created = {
-      id: `course-${Date.now()}`,
-      code: newCourseForm.code.trim() || 'POS-2026',
-      title: newCourseForm.title.trim(),
-      institution: newCourseForm.institution.trim(),
-      instructor: newCourseForm.instructor.trim(),
-      bannerTheme: 'course-banner-navy',
-      modality: 'Sin depósito (No Repository)',
-      maxSimilarityThreshold: Number(newCourseForm.maxSimilarityThreshold) || 15,
-      maxAiThreshold: Number(newCourseForm.maxAiThreshold) || 15,
-      studentsCount: 1,
-      submissionsCount: 0,
-      pendingReviews: 0,
-      status: 'active',
-      excludeBibliography: true,
-      excludeQuotes: true,
-      excludeSmallMatchesWords: 10,
-      description:
-        'Aula académica configurada para revisión segura de borradores y tesis sin indexación en el repositorio global.',
-      assignments: [
-        {
-          id: `asg-${Date.now()}`,
-          title: 'Entrega Principal de Investigación',
-          dueDate: '2026-12-20',
-          submissions: 0,
-          avgSimilarity: 0,
-          avgAiScore: 0,
-        },
-      ],
-    };
-    setCourses((prev) => [created, ...prev]);
-    setShowNewCourseModal(false);
-    setNewCourseForm({
-      code: 'DOC-2026-IV',
-      title: '',
-      institution: 'Escuela de Posgrado',
-      instructor: 'Dr. Saravia · Instructor Oficial',
-      maxSimilarityThreshold: 15,
-      maxAiThreshold: 15,
-    });
-    showNotification(`Curso "${created.title}" creado correctamente.`);
   };
 
   const handleCreateUser = (e) => {
     e.preventDefault();
     if (!newUserForm.name.trim() || !newUserForm.email.trim()) return;
     const chosenPlan = plans.find((p) => p.id === newUserForm.planId) || plans[0];
+    const limitVal = chosenPlan.feedbackPolicy?.dailyLimit || 7;
     const created = {
       id: `usr-${Date.now()}`,
       name: newUserForm.name.trim(),
@@ -410,14 +333,15 @@ export default function App() {
       expiresAt: new Date(Date.now() + 30 * 86400000).toISOString(),
       lastLogin: null,
       daily: {
-        limit: chosenPlan.feedbackPolicy?.dailyLimit || 7,
+        configuredLimit: limitVal,
+        limit: limitVal,
+        reserved: 0,
         consumed: 0,
-        remaining: chosenPlan.feedbackPolicy?.dailyLimit || 7,
+        remaining: limitVal,
       },
       sellerWhatsapp: newUserForm.sellerWhatsapp,
     };
     setUsers((prev) => [created, ...prev]);
-    setShowNewPlanModal(false);
     setShowNewUserModal(false);
     setNewUserForm({
       name: '',
@@ -426,19 +350,19 @@ export default function App() {
       deviceLimit: 2,
       sellerWhatsapp: '+51987654321',
     });
-    showNotification(`Cuenta creada para ${created.name} con plan ${created.planName}.`);
+    showNotification(`Cuenta creada para ${created.name} (${created.planName}).`);
   };
 
   const handleCreatePlan = (e) => {
     e.preventDefault();
     if (!newPlanForm.name.trim()) return;
-    const priceMinor = Math.round(( parseFloat(newPlanForm.pricePen) || 80 ) * 100);
+    const priceMinor = Math.round((parseFloat(newPlanForm.pricePen) || 80) * 100);
     const created = {
       id: `plan-${Date.now()}`,
       name: newPlanForm.name.trim().toUpperCase(),
       description:
         newPlanForm.description.trim() ||
-        'Plan académico con acceso a Turnitin Feedback Studio, IA y QuillBot.',
+        'Incluye reportes PDF diarios de Detección de IA y Similitud sin depósito.',
       priceMinor,
       currency: 'PEN',
       interval: 'month',
@@ -446,6 +370,11 @@ export default function App() {
       modality: 'instructor',
       billingMode: 'standard',
       assignedUsers: 0,
+      feedbackAccess: {
+        enabled: true,
+        mode: 'daily',
+        reportKinds: ['ai', 'similarity'],
+      },
       feedbackPolicy: {
         mode: 'daily',
         dailyLimit: Number(newPlanForm.dailyLimit) || 7,
@@ -461,7 +390,7 @@ export default function App() {
     setPlans((prev) => [...prev, created]);
     setShowNewPlanModal(false);
     setNewPlanForm({ name: '', description: '', pricePen: '90.00', dailyLimit: 7 });
-    showNotification(`Plan "${created.name}" añadido al catálogo comercial.`);
+    showNotification(`Plan "${created.name}" creado correctamente.`);
   };
 
   const handleSendChat = (promptText) => {
@@ -471,14 +400,7 @@ export default function App() {
       SEED_AI_MODELS.find((m) => m.model === selectedAiModel) || SEED_AI_MODELS[0];
 
     const userMsg = { role: 'user', text: content };
-    let reply = '';
-    if (content.toLowerCase().includes('apa') || content.toLowerCase().includes('parafrase')) {
-      reply = `✅ **Reescritura Académica (${activeModelObj.name} · Norma APA 7ma Ed.):**\n\n"En consonancia con la evidencia empírica reciente, la modernización de los sistemas de gestión institucional incide de manera directa en la transparencia administrativa y en la optimización de los recursos públicos, reduciendo las brechas de atención ciudadana (Méndez & Paredes, 2026)." \n\n• **Índice estimado de IA tras humanización:** < 2%\n• **Conservación terminológica:** 100%`;
-    } else if (content.toLowerCase().includes('spearman') || content.toLowerCase().includes('spss')) {
-      reply = `📊 **Interpretación Estadística (${activeModelObj.name}):**\n\nAl observarse un coeficiente de correlación **Rho de Spearman de r = 0.782** con una significancia bilateral **p = 0.000 (p < 0.05)**, se rechaza la hipótesis nula ($H_0$) y se acepta la hipótesis de investigación ($H_1$). Esto demuestra que existe una relación positiva considerable y estadísticamente significativa entre la variable independiente y el desempeño institucional en la muestra estudiada.`;
-    } else {
-      reply = `📚 **Respuesta de ${activeModelObj.name}:**\n\nHe estructurado tu solicitud siguiendo los estándares metodológicos de posgrado:\n1. **Planteamiento argumentativo:** Se contextualiza la problemática desde el ámbito internacional al nacional (Perú).\n2. **Rigor conceptual:** Se mantiene la trazabilidad entre objetivos específicos, dimensiones e indicadores.\n3. **Recomendación Turnitin:** Recuerda excluir la bibliografía y citas menores de 10 palabras antes de emitir el certificado final.`;
-    }
+    const reply = `✅ **Sugerencia de ${activeModelObj.name}:**\n\n"En concordancia con los antecedentes analizados, la implementación de mecanismos de control operativo fortalece la trazabilidad documental y optimiza la eficiencia institucional."\n\n• **Similitud estimada:** 0%\n• **Detección de IA estimada:** < 2% (Redacción natural)`;
 
     setChatMessages((prev) => [...prev, userMsg, { role: 'assistant', text: reply }]);
     setChatInput('');
@@ -489,29 +411,30 @@ export default function App() {
     setQbMode(mode);
     const variants = {
       academic:
-        'La presente investigación examina el vínculo existente entre los procesos de modernización digital y la eficiencia de la gestión pública en los gobiernos locales provinciales durante el ejercicio 2026 (APA 7ma ed.).',
+        'Este informe examina las métricas operativas y su incidencia en la mejora continua de los procedimientos institucionales durante el periodo 2026.',
       humanized:
-        'A lo largo de este trabajo analizamos cómo la incorporación de herramientas digitales transforma el funcionamiento administrativo de las municipalidades provinciales en el año 2026, desde una perspectiva práctica e institucional.',
+        'A través de este documento revisamos cómo los indicadores de gestión influyen directamente en la mejora de los procesos internos a lo largo del año 2026.',
       formal:
-        'El objetivo primordial de este estudio consiste en establecer el grado de correlación entre la transformación digital y el desempeño administrativo en las entidades ediles provinciales durante el periodo 2026.',
+        'La presente evaluación determina la correlación existente entre los indicadores administrativos y el fortalecimiento de los procesos organizacionales en el 2026.',
       concise:
-        'Este estudio evalúa el impacto de la transformación digital en la gestión administrativa municipal durante el 2026.',
+        'El documento evalúa el impacto de los indicadores de gestión en la mejora de procesos del 2026.',
     };
     setQbOutput(variants[mode] || variants.academic);
   };
 
   const filteredJobs = useMemo(() => {
     return jobs.filter((j) => {
-      const matchesCourse = jobCourseFilter === 'all' || j.courseCode === jobCourseFilter;
+      if (jobKindFilter === 'low' && j.similarityScore > 15) return false;
+      if (jobKindFilter === 'high' && j.similarityScore <= 15 && j.aiScore <= 15) return false;
       const q = jobSearch.trim().toLowerCase();
-      const matchesQuery =
-        !q ||
+      if (!q) return true;
+      return (
         j.name.toLowerCase().includes(q) ||
         j.displayCode.toLowerCase().includes(q) ||
-        (j.author || '').toLowerCase().includes(q);
-      return matchesCourse && matchesQuery;
+        (j.ownerName || '').toLowerCase().includes(q)
+      );
     });
-  }, [jobs, jobCourseFilter, jobSearch]);
+  }, [jobs, jobKindFilter, jobSearch]);
 
   const filteredUsers = useMemo(() => {
     return users.filter((u) => {
@@ -529,7 +452,7 @@ export default function App() {
     });
   }, [users, userFilter, userSearch]);
 
-  // If logged out, show the executive Login screen
+  // Login Screen
   if (!user) {
     return (
       <main className="auth-layout">
@@ -538,7 +461,6 @@ export default function App() {
             <div className="brand brand-dark">
               <TurnitinSymbol />
               <span>turnitinpe</span>
-              <span className="brand-badge">Academic Pro v2.0</span>
             </div>
             <button className="sidebar-icon-btn" onClick={toggleTheme} title="Cambiar tema">
               {theme === 'light' ? <Moon size={17} /> : <Sun size={17} />}
@@ -547,43 +469,43 @@ export default function App() {
 
           <div className="auth-story-body">
             <span className="auth-eyebrow">
-              <GraduationCap size={16} /> PLATAFORMA DE CURSOS E INTEGRIDAD ACADÉMICA
+              <ShieldCheck size={16} /> TU ESPACIO, CONECTADO · REPORTES DE IA Y SIMILITUD
             </span>
-            <h1>Todos tus cursos, revisiones Turnitin e IA en un solo acceso.</h1>
+            <h1>Todos tus reportes de IA y Similitud. Un solo acceso.</h1>
             <p className="auth-story-lead">
-              Gestiona tus aulas de tesis sin depósito (No Repository), emite informes oficiales de
-              Similitud y Detección de IA en segundos, y potencia tu investigación con más de 50
-              modelos académicos y QuillBot Premium.
+              Analiza tus documentos PDF y Word sin depósito (No Repository), descarga certificados
+              oficiales de Similitud y Detección de IA en segundos, y administra las cuotas y
+              accesos de tu equipo desde un panel centralizado.
             </p>
 
             <div className="auth-pillars">
               <div className="auth-pillar-card">
                 <span className="auth-pillar-icon">
-                  <GraduationCap size={18} />
+                  <FileCheck2 size={18} />
                 </span>
-                <strong>Aulas sin depósito</strong>
-                <span>Revisa borradores de tesis e investigaciones sin indexar el documento.</span>
+                <strong>IA + Similitud Oficial</strong>
+                <span>Informes PDF independientes procesados al instante sin indexación.</span>
               </div>
               <div className="auth-pillar-card">
                 <span className="auth-pillar-icon">
                   <ShieldCheck size={18} />
                 </span>
-                <strong>IA + Similitud Oficial</strong>
-                <span>Certificados verificados con filtros APA, exclusión de citas y bibliografía.</span>
+                <strong>Accesos a tu medida</strong>
+                <span>Planes diarios, ilimitados o por créditos con control de dispositivos.</span>
               </div>
               <div className="auth-pillar-card">
                 <span className="auth-pillar-icon">
                   <Sparkles size={18} />
                 </span>
-                <strong>Laboratorio IA & QuillBot</strong>
-                <span>Modelos para tesis, estadística SPSS, parafraseo humanizado y audio WAV.</span>
+                <strong>Servicios en un lugar</strong>
+                <span>Turnitin Feedback, Originality, QuillBot y Todas las IA conectadas.</span>
               </div>
             </div>
           </div>
 
           <div className="auth-story-footer">
-            <span>turnitinpe · Cada investigador, el acceso correcto.</span>
-            <span>Estación Lima Activa · 99.9% Uptime</span>
+            <span>turnitinpe · Cada persona, el acceso correcto.</span>
+            <span>Estación Chrome OriginalityPlus Activa</span>
           </div>
         </section>
 
@@ -594,33 +516,31 @@ export default function App() {
                 <TurnitinSymbol />
                 <span>turnitinpe</span>
               </div>
-              <span className="status-pill status-emerald">Estación en línea</span>
+              <span className="status-pill status-emerald">Recepción activa</span>
             </div>
 
             <h2>Bienvenido de nuevo</h2>
             <p className="auth-subtitle">
-              Ingresa a tu espacio académico de cursos, revisión antiplagio e inteligencia
-              artificial.
+              Entra a tu espacio de trabajo para enviar documentos y descargar tus informes de IA y
+              Similitud.
             </p>
 
             <div className="demo-accounts-box">
               <div className="demo-accounts-header">
-                <span>Acceso rápido con tus cuentas configuradas</span>
+                <span>Ingreso rápido de demostración</span>
               </div>
               <div className="demo-accounts-buttons">
                 <button
                   type="button"
                   className="demo-btn"
                   onClick={() => {
-                    setLoginEmail('saraviarosquetecomeverga@chivo.com');
-                    setLoginPassword('yacache@123456');
                     setUser(SEED_ADMIN_USER);
                     setViewMode('admin');
-                    showNotification('Ingresaste como Administrador: Saravia chivo');
+                    showNotification('Sesión iniciada como Administrador: Saravia chivo');
                   }}
                 >
                   <strong>Saravia chivo (Admin)</strong>
-                  <span>Panel total + Cursos + 71 clientes</span>
+                  <span>Gestión de 71 clientes y reportes</span>
                 </button>
                 <button
                   type="button"
@@ -629,41 +549,27 @@ export default function App() {
                     const client = SEED_USERS[1];
                     setUser(client);
                     setViewMode('member');
-                    showNotification(`Ingresaste como Tesista/Instructor: ${client.name}`);
+                    setActiveTab('turnitin2');
+                    showNotification(`Vista Cliente activa: ${client.name}`);
                   }}
                 >
-                  <strong>Vista Instructor / Tesista</strong>
-                  <span>Mis Cursos + Subida PDF + IA</span>
+                  <strong>Vista Cliente (Ecola)</strong>
+                  <span>Subir PDF y descargar informes</span>
                 </button>
               </div>
             </div>
-
-            {loginError && (
-              <div
-                style={{
-                  padding: 12,
-                  borderRadius: 8,
-                  background: 'var(--crimson-soft)',
-                  color: 'var(--crimson)',
-                  marginBottom: 14,
-                  fontSize: 13,
-                }}
-              >
-                {loginError}
-              </div>
-            )}
 
             <form
               onSubmit={handleLogin}
               style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
             >
               <label className="field">
-                Correo electrónico institucional o personal
+                Correo electrónico
                 <input
                   type="email"
                   value={loginEmail}
                   onChange={(e) => setLoginEmail(e.target.value)}
-                  placeholder="correo@universidad.edu.pe"
+                  placeholder="tu@correo.com"
                   required
                 />
               </label>
@@ -685,7 +591,7 @@ export default function App() {
                 disabled={loginBusy}
                 style={{ marginTop: 6, minHeight: 44 }}
               >
-                {loginBusy ? 'Verificando acceso…' : 'Iniciar sesión en mi espacio'}
+                {loginBusy ? 'Iniciando sesión…' : 'Iniciar sesión'}
               </button>
             </form>
           </div>
@@ -696,20 +602,15 @@ export default function App() {
 
   const isAdminView = viewMode === 'admin';
 
+  // Exact navigation matching turnitinpe.com
   const navGroups = [
     {
-      label: 'AULAS Y REVISIÓN ACADÉMICA',
+      label: 'REPORTES Y ANÁLISIS',
       items: [
-        { id: 'overview', label: 'Inicio Ejecutivo', icon: LayoutDashboard },
-        {
-          id: 'courses',
-          label: 'Mis Cursos y Clases',
-          icon: GraduationCap,
-          badge: `${courses.length} aulas`,
-        },
+        { id: 'overview', label: 'Inicio', icon: LayoutDashboard },
         {
           id: 'turnitin2',
-          label: 'Turnitin Feedback Studio',
+          label: 'Turnitin Feedback',
           icon: FileCheck2,
           proBadge: 'IA + Sim',
         },
@@ -721,31 +622,23 @@ export default function App() {
       ],
     },
     {
-      label: 'HERRAMIENTAS DE INVESTIGACIÓN',
+      label: 'SERVICIOS COMPLEMENTARIOS',
       items: [
-        {
-          id: 'nvidia',
-          label: 'Todas las IA · Laboratorio',
-          icon: Sparkles,
-          badge: '50+ IA',
-        },
-        {
-          id: 'quillbot',
-          label: 'QuillBot Parafraseador',
-          icon: Feather,
-        },
+        { id: 'quillbot', label: 'QuillBot', icon: Feather },
+        { id: 'nvidia', label: 'Todas las IA', icon: Sparkles },
       ],
     },
     ...(isAdminView
       ? [
           {
-            label: 'ADMINISTRACIÓN Y COMERCIAL',
+            label: 'ADMINISTRACIÓN DEL ESPACIO',
             items: [
-              { id: 'users', label: 'Clientes y Accesos', icon: Users, badge: '71' },
-              { id: 'plans', label: 'Planes y Membresías', icon: CreditCard },
-              { id: 'daily-limits', label: 'Control de Cuotas Lima', icon: BarChart3 },
-              { id: 'turnitin-settings', label: 'Estaciones Chrome', icon: Settings },
-              { id: 'activity', label: 'Auditoría en Vivo', icon: History },
+              { id: 'users', label: 'Usuarios', icon: Users, badge: String(users.length) },
+              { id: 'plans', label: 'Planes y precios', icon: CreditCard },
+              { id: 'turnitin-settings', label: 'Configuración de Turnitin', icon: Settings },
+              { id: 'daily-limits', label: 'Historial de cuotas', icon: BarChart3 },
+              { id: 'client-uploads', label: 'Archivos de clientes', icon: HardDrive },
+              { id: 'activity', label: 'Actividad', icon: History },
             ],
           },
         ]
@@ -754,77 +647,75 @@ export default function App() {
 
   const pageMeta = {
     overview: {
-      eyebrow: isAdminView ? 'CENTRO DE CONTROL ACADÉMICO' : 'MI ESPACIO DE INVESTIGACIÓN',
-      title: isAdminView
-        ? `Bienvenido de nuevo, ${user.name}`
-        : `Hola, ${user.name} · Espacio de Tesis e Investigación`,
+      eyebrow: isAdminView ? 'VISTA GENERAL' : 'BIENVENIDO',
+      title: isAdminView ? `Hola, ${user.name}.` : `Hola, ${user.name}`,
       subtitle: isAdminView
-        ? 'Supervisa en tiempo real tus aulas académicas, la estación Chrome OriginalityPlus, las entregas de Turnitin y las 71 cuentas activas.'
-        : 'Selecciona tu aula académica, sube tu documento sin depósito (No Repository) o utiliza el Laboratorio de IA y QuillBot.',
-    },
-    courses: {
-      eyebrow: 'GESTIÓN DE AULAS Y CURSOS ACADÉMICOS',
-      title: 'Cursos, Seminarios de Tesis y Clases Activas',
-      subtitle:
-        'Cada curso opera bajo modalidad Sin Depósito (No Repository) con umbrales personalizados de similitud e IA y exclusión bibliográfica automática.',
+        ? 'Así va tu espacio hoy: supervisión de reportes de IA y Similitud, usuarios activos y servicios conectados.'
+        : 'Elige el servicio contratado que deseas abrir para procesar tus documentos.',
     },
     turnitin2: {
-      eyebrow: 'TURNITIN FEEDBACK STUDIO · SIN DEPÓSITO',
-      title: 'Revisión de Similitud y Detección de Escritura con IA',
+      eyebrow: 'TU ESPACIO DE ANÁLISIS',
+      title: 'Turnitin Feedback · Detección de IA y Similitud',
       subtitle:
-        'Sube documentos PDF o Word (.docx). Los certificados oficiales se procesan automáticamente mediante la Estación Chrome conectada.',
+        'Prepara una nueva solicitud de análisis en PDF y descarga tus informes oficiales de IA y Similitud sin depósito.',
     },
     documents: {
-      eyebrow: 'REPOSITORIO PRIVADO · TURNITIN ORIGINALITY',
-      title: 'Mis Documentos y Certificados Emitidos',
+      eyebrow: 'DOCUMENTOS PRIVADOS',
+      title: 'Turnitin Originality · Tus archivos en un lugar',
       subtitle:
-        'Consulta el historial íntegro de manuscritos analizados, compara versiones de tesis y descarga tus certificados verificados.',
-    },
-    nvidia: {
-      eyebrow: 'LABORATORIO MULTIMODELO · NVIDIA AI ENTERPRISE',
-      title: 'Todas las IA para Investigación, Tesis y Estadística',
-      subtitle:
-        'Accede a modelos calibrados para redacción APA 7ma edición, interpretación de tablas SPSS, revisión por pares Scopus y transcripción WAV.',
+        'Guarda documentos (.docx / .pdf), aplica filtros de exclusión y consulta sus informes independientes.',
     },
     quillbot: {
-      eyebrow: 'APOYO A LA REDACCIÓN CIENTÍFICA',
-      title: 'QuillBot Premium · Parafraseo Académico y Credenciales',
+      eyebrow: 'APOYO A LA REDACCIÓN',
+      title: 'QuillBot · Parafraseo y Credenciales',
       subtitle:
-        'Reescribe párrafos densos conservando las citas académicas o utiliza las credenciales institucionales directas.',
+        'Herramientas de apoyo para reformular coincidencias y credenciales directas para clientes activos.',
+    },
+    nvidia: {
+      eyebrow: 'INTELIGENCIA ARTIFICIAL',
+      title: 'Todas las IA · Chat y Transcripción NVIDIA',
+      subtitle:
+        'Modelos de inteligencia artificial y transcripción de audio WAV incluidos en tu espacio.',
     },
     users: {
-      eyebrow: 'ADMINISTRACIÓN DE CUENTAS Y DISPOSITIVOS',
-      title: 'Directorio de Clientes, Instructores y Tesistas',
+      eyebrow: 'EQUIPO Y PERMISOS',
+      title: 'Personas con acceso.',
       subtitle:
-        'Gestiona planes asignados, cuotas diarias de reportes, límite de dispositivos y envíos de renovación por WhatsApp en un clic.',
+        'Crea cuentas, asigna planes, controla el límite de dispositivos, acredita reportes y envía accesos por WhatsApp.',
     },
     plans: {
-      eyebrow: 'CATÁLOGO COMERCIAL · MONEDA NACIONAL (PEN)',
-      title: 'Planes, Tarifas y Políticas de Acceso',
+      eyebrow: 'CATÁLOGO COMERCIAL',
+      title: 'Planes y precios.',
       subtitle:
-        'Configura los planes para estudiantes, instructores y centros de investigación con permisos granulares por herramienta.',
-    },
-    'daily-limits': {
-      eyebrow: 'HORA OFICIAL AMERICA/LIMA · CORTE DIARIO',
-      title: 'Historial de Cuotas y Acreditación de Reportes',
-      subtitle:
-        'Monitorea los reportes consumidos hoy por cada cliente y acredita unidades adicionales confirmadas por pago.',
+        'Define precios en Soles (PEN), cuotas diarias de PDF (IA + Similitud) y permisos incluidos.',
     },
     'turnitin-settings': {
-      eyebrow: 'INFRAESTRUCTURA DE PROCESAMIENTO',
-      title: 'Estaciones Chrome Vinculadas y Conservación',
+      eyebrow: 'PROCESAMIENTO Y ESTACIONES',
+      title: 'Configuración de Turnitin.',
       subtitle:
-        'Administra los nodos OriginalityPlus / AcademiaCX conectados mediante extensión Chrome y las reglas de retención de archivos.',
+        'Administra el proveedor (OriginalityPlus / AcademiaCX), las vinculaciones Chrome de 7 días y la conservación de informes.',
+    },
+    'daily-limits': {
+      eyebrow: 'HORA EN LIMA (AMERICA/LIMA)',
+      title: 'Historial de cuotas de reportes.',
+      subtitle:
+        'Consulta los reportes consumidos hoy por cada cliente y acredita unidades adicionales.',
+    },
+    'client-uploads': {
+      eyebrow: 'ALMACENAMIENTO DE DOCUMENTOS',
+      title: 'Archivos de clientes.',
+      subtitle:
+        'Supervisa el volumen de documentos subidos por cada cliente y su estado de procesamiento.',
     },
     activity: {
-      eyebrow: 'TRAZABILIDAD Y SEGURIDAD',
-      title: 'Registro de Auditoría del Espacio',
+      eyebrow: 'REGISTRO DEL ESPACIO',
+      title: 'Actividad de usuarios.',
       subtitle:
-        'Historial cronológico de inicios de sesión, certificados generados y movimientos administrativos.',
+        'Consulta las sesiones iniciadas, los trabajos procesados por la estación Chrome y los movimientos administrativos.',
     },
   }[activeTab] || {
-    eyebrow: 'ESPACIO ACADÉMICO',
-    title: 'TurnitinPE',
+    eyebrow: 'TURNITINPE',
+    title: 'Espacio de trabajo',
     subtitle: '',
   };
 
@@ -836,7 +727,6 @@ export default function App() {
           <div className="brand brand-dark">
             <TurnitinSymbol />
             <span>turnitinpe</span>
-            <span className="brand-badge">PRO</span>
           </div>
           {mobileNavOpen && (
             <button
@@ -863,15 +753,20 @@ export default function App() {
             onClick={() => {
               setViewMode('member');
               if (
-                ['users', 'plans', 'daily-limits', 'turnitin-settings', 'activity'].includes(
-                  activeTab
-                )
+                [
+                  'users',
+                  'plans',
+                  'daily-limits',
+                  'turnitin-settings',
+                  'client-uploads',
+                  'activity',
+                ].includes(activeTab)
               ) {
-                setActiveTab('courses');
+                setActiveTab('turnitin2');
               }
             }}
           >
-            <GraduationCap size={14} /> Vista Aula/Cliente
+            <FileCheck2 size={14} /> Vista Cliente
           </button>
         </div>
 
@@ -906,7 +801,7 @@ export default function App() {
         <div className="sidebar-footer">
           <div className="sidebar-station-pill">
             <span className="pulse-dot" />
-            <span>Estación OriginalityPlus · Activa</span>
+            <span>Estación Chrome · OriginalityPlus</span>
           </div>
 
           <div className="sidebar-profile-row">
@@ -918,14 +813,14 @@ export default function App() {
               <span className="avatar avatar-sm">{getInitials(user.name)}</span>
               <span className="sidebar-profile-info">
                 <strong>{user.name}</strong>
-                <small>{isAdminView ? 'Administrador · Instructor' : 'Plan Investigador Pro'}</small>
+                <small>{isAdminView ? 'Administrador (report_admin)' : user.planName || 'INSTRUCTOR BASICO'}</small>
               </span>
             </button>
             <button
               type="button"
               className="sidebar-icon-btn"
               onClick={toggleTheme}
-              title={theme === 'light' ? 'Activar modo oscuro' : 'Activar modo claro'}
+              title={theme === 'light' ? 'Modo oscuro' : 'Modo claro'}
             >
               {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
             </button>
@@ -954,7 +849,7 @@ export default function App() {
               <Menu size={18} />
             </button>
             <div className="topbar-breadcrumb">
-              <span>Espacio Académico</span>
+              <span>turnitinpe</span>
               <span>/</span>
               <strong>{pageMeta.title}</strong>
             </div>
@@ -963,18 +858,18 @@ export default function App() {
           <div className="topbar-right">
             <span className="quota-chip">
               <ShieldCheck size={14} style={{ color: 'var(--emerald)' }} />
-              Sin depósito (No Repository)
+              Sin Depósito (No Repository)
             </span>
             <span className="quota-chip">
-              <Sparkles size={14} style={{ color: 'var(--brand-primary)' }} />
-              IA hoy: {aiUsedToday} / 100
+              <FileCheck2 size={14} style={{ color: 'var(--brand-primary)' }} />
+              {isAdminView ? 'Reportes Ilimitados' : 'Cuota hoy: 5 / 7 disponibles'}
             </span>
             <button
               type="button"
               className="button button-primary button-sm"
               onClick={() => setActiveTab('turnitin2')}
             >
-              <Upload size={14} /> Subir Tesis / Documento
+              <Upload size={14} /> Subir Documento PDF
             </button>
           </div>
         </header>
@@ -988,22 +883,13 @@ export default function App() {
               <p>{pageMeta.subtitle}</p>
             </div>
             <div className="page-actions">
-              {activeTab === 'courses' && (
-                <button
-                  type="button"
-                  className="button button-primary"
-                  onClick={() => setShowNewCourseModal(true)}
-                >
-                  <Plus size={16} /> Crear Nuevo Curso / Aula
-                </button>
-              )}
               {activeTab === 'users' && (
                 <button
                   type="button"
                   className="button button-primary"
                   onClick={() => setShowNewUserModal(true)}
                 >
-                  <Plus size={16} /> Crear Cuenta de Cliente
+                  <Plus size={16} /> Crear cuenta
                 </button>
               )}
               {activeTab === 'plans' && (
@@ -1012,14 +898,14 @@ export default function App() {
                   className="button button-primary"
                   onClick={() => setShowNewPlanModal(true)}
                 >
-                  <Plus size={16} /> Crear Nuevo Plan
+                  <Plus size={16} /> Crear plan
                 </button>
               )}
             </div>
           </div>
 
           {/* ==========================================
-              TAB 1: OVERVIEW (INICIO EJECUTIVO)
+              TAB 1: INICIO (OVERVIEW)
              ========================================== */}
           {activeTab === 'overview' && (
             <>
@@ -1032,128 +918,57 @@ export default function App() {
                     </span>
                   </div>
                   <div className="metric-value">71</div>
-                  <span className="metric-note">66 accesos activos · 5 por renovar</span>
+                  <span className="metric-note">Cuentas registradas en turnitinpe</span>
                 </article>
 
                 <article className="metric-card">
                   <div className="metric-top">
-                    <span>Cursos y Aulas Activas</span>
+                    <span>Accesos activos</span>
                     <span className="metric-icon metric-emerald">
-                      <GraduationCap size={18} />
+                      <CheckCircle2 size={18} />
                     </span>
                   </div>
-                  <div className="metric-value">{courses.length}</div>
-                  <span className="metric-note">Modalidad Sin Depósito (No Repository)</span>
+                  <div className="metric-value">66</div>
+                  <span className="metric-note">Listos para enviar documentos hoy</span>
                 </article>
 
                 <article className="metric-card">
                   <div className="metric-top">
-                    <span>Informes Procesados</span>
+                    <span>Trabajos procesados</span>
                     <span className="metric-icon metric-amber">
                       <FileCheck2 size={18} />
                     </span>
                   </div>
                   <div className="metric-value">{100 + jobs.length - SEED_JOBS.length}</div>
-                  <span className="metric-note">Tiempo medio: 85 seg · IA + Similitud</span>
+                  <span className="metric-note">Reportes PDF de IA + Similitud</span>
                 </article>
 
                 <article className="metric-card">
                   <div className="metric-top">
-                    <span>Modelos IA & QuillBot</span>
+                    <span>Estaciones Chrome</span>
                     <span className="metric-icon metric-blue">
-                      <Sparkles size={18} />
+                      <ShieldCheck size={18} />
                     </span>
                   </div>
-                  <div className="metric-value">52</div>
-                  <span className="metric-note">Catálogo NVIDIA + QuillBot Premium activo</span>
+                  <div className="metric-value">26</div>
+                  <span className="metric-note">OriginalityPlus conectada en vivo</span>
                 </article>
               </div>
 
-              {/* Quick Academic Courses Preview */}
-              <section className="panel">
-                <div className="panel-header">
-                  <div>
-                    <h2>Mis Cursos y Aulas de Revisión Turnitin</h2>
-                    <p>
-                      Aulas configuradas al estilo Instructor para revisar tesis y artículos sin
-                      indexarlos en el repositorio.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    className="button button-secondary button-sm"
-                    onClick={() => setActiveTab('courses')}
-                  >
-                    Ver todas las aulas ({courses.length})
-                  </button>
-                </div>
-
-                <div className="courses-grid">
-                  {courses.slice(0, 3).map((course) => (
-                    <article key={course.id} className="course-card">
-                      <div className={`course-card-banner ${course.bannerTheme}`}>
-                        <div className="course-banner-top">
-                          <span className="course-code-pill">{course.code}</span>
-                          <span className="course-code-pill">{course.modality}</span>
-                        </div>
-                        <h3>{course.title}</h3>
-                        <span className="course-instructor">
-                          {course.institution} · {course.instructor}
-                        </span>
-                      </div>
-
-                      <div className="course-card-body">
-                        <div className="course-stats-row">
-                          <div className="course-stat">
-                            <span>Umbral Similitud</span>
-                            <strong>≤ {course.maxSimilarityThreshold}%</strong>
-                          </div>
-                          <div className="course-stat">
-                            <span>Umbral IA</span>
-                            <strong>≤ {course.maxAiThreshold}%</strong>
-                          </div>
-                          <div className="course-stat">
-                            <span>Entregas</span>
-                            <strong>{course.submissionsCount}</strong>
-                          </div>
-                        </div>
-                        <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                          {course.description}
-                        </p>
-                      </div>
-
-                      <div className="course-card-footer">
-                        <span className="status-pill status-emerald">Recepción abierta</span>
-                        <button
-                          type="button"
-                          className="button button-primary button-sm"
-                          onClick={() => {
-                            setUploadCourseCode(course.code);
-                            setActiveTab('turnitin2');
-                          }}
-                        >
-                          <Upload size={13} /> Subir a esta aula
-                        </button>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              </section>
-
               <div className="overview-grid">
-                {/* Latest Turnitin Certificates */}
+                {/* Latest Reports */}
                 <section className="panel">
                   <div className="panel-header">
                     <div>
-                      <h2>Últimos Certificados Turnitin Emitidos</h2>
-                      <p>Haz clic en cualquier entrega para abrir el visor interactivo de similitud e IA.</p>
+                      <h2>Últimos Reportes de IA y Similitud</h2>
+                      <p>Haz clic en cualquier trabajo para abrir el visor o descargar sus PDF.</p>
                     </div>
                     <button
                       type="button"
-                      className="button button-secondary button-sm"
+                      className="button button-primary button-sm"
                       onClick={() => setActiveTab('turnitin2')}
                     >
-                      Ir a Feedback Studio
+                      <Upload size={13} /> Nuevo Análisis
                     </button>
                   </div>
 
@@ -1162,14 +977,14 @@ export default function App() {
                       <thead>
                         <tr>
                           <th>Código</th>
-                          <th>Documento / Aula</th>
+                          <th>Documento</th>
                           <th>Similitud</th>
-                          <th>Escritura IA</th>
-                          <th>Acción</th>
+                          <th>Detección IA</th>
+                          <th>Informes</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {jobs.slice(0, 4).map((job) => (
+                        {jobs.slice(0, 5).map((job) => (
                           <tr key={job.id}>
                             <td>
                               <span className="code-chip">#{job.displayCode}</span>
@@ -1177,9 +992,7 @@ export default function App() {
                             <td>
                               <div className="person-meta">
                                 <strong>{job.name}</strong>
-                                <span>
-                                  Aula {job.courseCode} · {job.author}
-                                </span>
+                                <span>Cliente: {job.ownerName}</span>
                               </div>
                             </td>
                             <td>
@@ -1210,7 +1023,7 @@ export default function App() {
                                 className="button button-secondary button-sm"
                                 onClick={() => setSelectedJobForReport(job)}
                               >
-                                <Eye size={13} /> Ver Certificado
+                                <Eye size={13} /> Ver Reporte
                               </button>
                             </td>
                           </tr>
@@ -1220,12 +1033,12 @@ export default function App() {
                   </div>
                 </section>
 
-                {/* Connected Services Status */}
+                {/* Services Status */}
                 <section className="panel">
                   <div className="panel-header">
                     <div>
-                      <h2>Servicios Conectados</h2>
-                      <p>Estado operativo de tu infraestructura</p>
+                      <h2>Servicios del Espacio</h2>
+                      <p>4 herramientas conectadas en tu dashboard</p>
                     </div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -1246,7 +1059,7 @@ export default function App() {
                         <div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <strong>{svc.name}</strong>
-                            <span className="status-pill status-emerald">Operativo</span>
+                            <span className="status-pill status-emerald">Recepción activa</span>
                           </div>
                           <p
                             style={{
@@ -1255,7 +1068,7 @@ export default function App() {
                               marginTop: 3,
                             }}
                           >
-                            {svc.operationalDetail}
+                            {svc.description}
                           </p>
                         </div>
                         <button
@@ -1276,116 +1089,7 @@ export default function App() {
           )}
 
           {/* ==========================================
-              TAB 2: MIS CURSOS Y CLASES (PRO LMS VIEW)
-             ========================================== */}
-          {activeTab === 'courses' && (
-            <>
-              <div className="courses-grid">
-                {courses.map((course) => (
-                  <article key={course.id} className="course-card">
-                    <div className={`course-card-banner ${course.bannerTheme}`}>
-                      <div className="course-banner-top">
-                        <span className="course-code-pill">{course.code}</span>
-                        <span className="course-code-pill">{course.modality}</span>
-                      </div>
-                      <h3>{course.title}</h3>
-                      <span className="course-instructor">
-                        {course.institution} · {course.instructor}
-                      </span>
-                    </div>
-
-                    <div className="course-card-body">
-                      <div className="course-stats-row">
-                        <div className="course-stat">
-                          <span>Máx. Similitud</span>
-                          <strong>≤ {course.maxSimilarityThreshold}%</strong>
-                        </div>
-                        <div className="course-stat">
-                          <span>Máx. IA</span>
-                          <strong>≤ {course.maxAiThreshold}%</strong>
-                        </div>
-                        <div className="course-stat">
-                          <span>Entregas</span>
-                          <strong>{course.submissionsCount}</strong>
-                        </div>
-                      </div>
-
-                      <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                        {course.description}
-                      </p>
-
-                      <div
-                        style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 8,
-                          paddingTop: 6,
-                          borderTop: '1px solid var(--border-color)',
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontSize: 11.5,
-                            fontWeight: 700,
-                            color: 'var(--text-muted)',
-                            textTransform: 'uppercase',
-                          }}
-                        >
-                          Bandejas de entrega activas:
-                        </span>
-                        {course.assignments.map((asg) => (
-                          <div
-                            key={asg.id}
-                            style={{
-                              padding: '8px 10px',
-                              borderRadius: 8,
-                              background: 'var(--bg-surface-subtle)',
-                              border: '1px solid var(--border-color)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              fontSize: 12.5,
-                            }}
-                          >
-                            <span>
-                              <strong>{asg.title}</strong>
-                            </span>
-                            <span className="code-chip">Media: {asg.avgSimilarity}%</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="course-card-footer">
-                      <button
-                        type="button"
-                        className="button button-secondary button-sm"
-                        onClick={() => {
-                          setJobCourseFilter(course.code);
-                          setActiveTab('turnitin2');
-                        }}
-                      >
-                        <Eye size={14} /> Ver entregas del curso
-                      </button>
-                      <button
-                        type="button"
-                        className="button button-primary button-sm"
-                        onClick={() => {
-                          setUploadCourseCode(course.code);
-                          setActiveTab('turnitin2');
-                        }}
-                      >
-                        <Upload size={14} /> Subir documento
-                      </button>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </>
-          )}
-
-          {/* ==========================================
-              TAB 3 & 4: TURNITIN FEEDBACK STUDIO & ORIGINALITY
+              TAB 2 & 3: TURNITIN FEEDBACK & ORIGINALITY
              ========================================== */}
           {(activeTab === 'turnitin2' || activeTab === 'documents') && (
             <>
@@ -1394,12 +1098,12 @@ export default function App() {
                 <section className="panel">
                   <div className="panel-header">
                     <div>
-                      <h2>Subir Documento a Revisión Oficial</h2>
-                      <p>
-                        Procesamiento en 90 segundos · Sin depósito en base de datos institucional
-                      </p>
+                      <h2>Subir documento</h2>
+                      <p>Prepara una nueva solicitud de análisis de IA y Similitud.</p>
                     </div>
-                    <span className="status-pill status-emerald">1 Crédito = IA + Similitud</span>
+                    <span className="status-pill status-emerald">
+                      1 crédito por documento · IA + Similitud
+                    </span>
                   </div>
 
                   <form
@@ -1409,7 +1113,7 @@ export default function App() {
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept=".pdf,.docx,.doc"
+                      accept=".pdf,.docx"
                       style={{ display: 'none' }}
                       onChange={(e) => {
                         const file = e.target.files?.[0];
@@ -1429,51 +1133,38 @@ export default function App() {
                       <div>
                         <strong style={{ fontSize: 15, display: 'block' }}>
                           {uploadFileName
-                            ? `Archivo seleccionado: ${uploadFileName}`
-                            : 'Haz clic para seleccionar tu archivo PDF o Word (.docx)'}
+                            ? `Archivo listo: ${uploadFileName}`
+                            : 'Arrastra tu archivo PDF aquí o selecciona un archivo desde tu equipo'}
                         </strong>
                         <span style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>
-                          Tamaño máximo: 100 MB · Mínimo 300 palabras · Idiomas: Español, Inglés,
-                          Portugués
+                          Hasta 100 MB por documento · Sin depósito en base de datos Turnitin
                         </span>
                       </div>
                     </div>
 
                     <div className="form-grid">
                       <label className="field">
-                        Curso / Aula de destino
-                        <select
-                          value={uploadCourseCode}
-                          onChange={(e) => setUploadCourseCode(e.target.value)}
-                        >
-                          {courses.map((c) => (
-                            <option key={c.id} value={c.code}>
-                              {c.code} · {c.title}
-                            </option>
-                          ))}
-                        </select>
+                        Nombre del documento (opcional)
+                        <input
+                          type="text"
+                          value={uploadFileName}
+                          onChange={(e) => setUploadFileName(e.target.value)}
+                          placeholder="Ej. proyectofin_26.corregido1.pdf"
+                        />
                       </label>
 
                       <label className="field">
-                        Nombre del autor / tesista
-                        <input
-                          type="text"
-                          value={uploadAuthor}
-                          onChange={(e) => setUploadAuthor(e.target.value)}
-                          placeholder={user.name}
-                        />
+                        Tipo de informe solicitado
+                        <select
+                          value={uploadReportMode}
+                          onChange={(e) => setUploadReportMode(e.target.value)}
+                        >
+                          <option value="both">IA + Similitud (Ambos informes PDF)</option>
+                          <option value="similarity">Solo Similitud</option>
+                          <option value="ai">Solo Detección de IA</option>
+                        </select>
                       </label>
                     </div>
-
-                    <label className="field">
-                      Título o nombre personalizado del archivo (opcional)
-                      <input
-                        type="text"
-                        value={uploadFileName}
-                        onChange={(e) => setUploadFileName(e.target.value)}
-                        placeholder="Ej. Tesis_Final_Maestria_Gestion_Publica_2026.pdf"
-                      />
-                    </label>
 
                     <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                       <button
@@ -1482,23 +1173,21 @@ export default function App() {
                         disabled={isUploading}
                       >
                         <FileCheck2 size={16} />
-                        {isUploading
-                          ? 'Analizando en Estación Turnitin…'
-                          : 'Analizar Documento y Emitir Certificados'}
+                        {isUploading ? 'Procesando en estación…' : 'Enviar documento'}
                       </button>
                       <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                        Incluye informe de Similitud (%) + Detección de Escritura IA (%)
+                        Detección de IA ilimitada · Los informes nunca se indexan en repositorio.
                       </span>
                     </div>
                   </form>
                 </section>
 
-                {/* Calibration & Filters */}
+                {/* Similarity Filters */}
                 <section className="panel">
                   <div className="panel-header">
                     <div>
-                      <h2>Parámetros y Filtros de Calibración</h2>
-                      <p>Configurados según el reglamento de grados y títulos (SUNEDU / APA 7)</p>
+                      <h2>Filtros del Informe de Similitud</h2>
+                      <p>Configura las exclusiones antes de enviar tu documento</p>
                     </div>
                     <Sliders size={18} style={{ color: 'var(--brand-primary)' }} />
                   </div>
@@ -1512,11 +1201,11 @@ export default function App() {
                       />
                       <div>
                         <strong style={{ display: 'block', fontSize: 13.5 }}>
-                          Excluir referencias bibliográficas
+                          Excluir bibliografía
                         </strong>
                         <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                          Omite la sección de Bibliografía / Referencias en formato APA, IEEE o
-                          Vancouver.
+                          Ignora la lista de referencias bibliográficas al calcular el porcentaje de
+                          similitud.
                         </span>
                       </div>
                     </label>
@@ -1529,11 +1218,10 @@ export default function App() {
                       />
                       <div>
                         <strong style={{ display: 'block', fontSize: 13.5 }}>
-                          Excluir citas textuales entrecomilladas
+                          Excluir citas textuales
                         </strong>
                         <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                          No contabiliza fragmentos citados correctamente entre comillas o bloques
-                          indentados.
+                          Excluye el texto citado correctamente entre comillas del puntaje total.
                         </span>
                       </div>
                     </label>
@@ -1549,8 +1237,7 @@ export default function App() {
                           Excluir coincidencias menores (&lt; 10 palabras)
                         </strong>
                         <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                          Evita falsos positivos en nombres de instituciones, leyes y conectores
-                          comunes.
+                          Evita que frases comunes o nombres propios sumen porcentaje de similitud.
                         </span>
                       </div>
                     </label>
@@ -1558,36 +1245,31 @@ export default function App() {
                 </section>
               </div>
 
-              {/* Submissions / Jobs Table */}
+              {/* Jobs / Documents Table */}
               <section className="panel">
                 <div className="panel-header">
                   <div>
-                    <h2>Bandeja de Informes y Certificados Emitidos</h2>
-                    <p>
-                      Mostrando {filteredJobs.length} documentos procesados · Haz clic en "Ver
-                      Informe" para inspeccionar las fuentes.
-                    </p>
+                    <h2>Mis documentos y trabajos ({filteredJobs.length})</h2>
+                    <p>Consulta el estado y descarga tus informes PDF de IA y Similitud.</p>
                   </div>
 
                   <div className="toolbar">
-                    <select
-                      value={jobCourseFilter}
-                      onChange={(e) => setJobCourseFilter(e.target.value)}
-                      style={{
-                        padding: '8px 12px',
-                        borderRadius: 8,
-                        border: '1px solid var(--border-color)',
-                        background: 'var(--bg-surface)',
-                        fontSize: 13,
-                      }}
-                    >
-                      <option value="all">Todas las aulas ({courses.length})</option>
-                      {courses.map((c) => (
-                        <option key={c.id} value={c.code}>
-                          Aula {c.code}
-                        </option>
+                    <div className="filter-tabs">
+                      {[
+                        { id: 'all', label: 'Todos' },
+                        { id: 'low', label: 'Similitud ≤ 15%' },
+                        { id: 'high', label: 'Por revisar (>15%)' },
+                      ].map((f) => (
+                        <button
+                          key={f.id}
+                          type="button"
+                          className={`filter-tab ${jobKindFilter === f.id ? 'active' : ''}`}
+                          onClick={() => setJobKindFilter(f.id)}
+                        >
+                          {f.label}
+                        </button>
                       ))}
-                    </select>
+                    </div>
 
                     <div className="search-box">
                       <Search size={15} style={{ color: 'var(--text-muted)' }} />
@@ -1595,7 +1277,7 @@ export default function App() {
                         type="text"
                         value={jobSearch}
                         onChange={(e) => setJobSearch(e.target.value)}
-                        placeholder="Buscar por código (#13912), archivo o autor…"
+                        placeholder="Buscar por código (#13912), documento o cliente…"
                       />
                     </div>
                   </div>
@@ -1605,13 +1287,12 @@ export default function App() {
                   <table className="data-table">
                     <thead>
                       <tr>
-                        <th>ID</th>
-                        <th>Documento / Manuscrito</th>
-                        <th>Aula</th>
-                        <th>Autor</th>
-                        <th>Similitud</th>
-                        <th>Detección IA</th>
-                        <th>Fecha Lima</th>
+                        <th>Código</th>
+                        <th>Documento</th>
+                        <th>Cliente</th>
+                        <th>Informe Similitud</th>
+                        <th>Informe IA</th>
+                        <th>Actividad</th>
                         <th>Acciones</th>
                       </tr>
                     </thead>
@@ -1625,15 +1306,17 @@ export default function App() {
                             <div className="person-meta">
                               <strong>{job.name}</strong>
                               <span>
-                                {job.pages || 48} págs ·{' '}
-                                {((job.sizeBytes || 1200000) / 1024 / 1024).toFixed(2)} MB
+                                {((job.sizeBytes || 1200000) / 1024 / 1024).toFixed(2)} MB ·{' '}
+                                {job.pages || 48} págs.
                               </span>
                             </div>
                           </td>
                           <td>
-                            <span className="code-chip">{job.courseCode || 'POS-2026-II'}</span>
+                            <div className="person-meta">
+                              <strong>{job.ownerName}</strong>
+                              <span>{job.ownerEmail}</span>
+                            </div>
                           </td>
-                          <td>{job.author || job.ownerName}</td>
                           <td>
                             <span
                               className={`status-pill ${
@@ -1657,7 +1340,7 @@ export default function App() {
                             </span>
                           </td>
                           <td style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>
-                            {new Date(job.createdAt).toLocaleDateString('es-PE', {
+                            {new Date(job.createdAt).toLocaleString('es-PE', {
                               day: '2-digit',
                               month: 'short',
                               hour: '2-digit',
@@ -1677,9 +1360,28 @@ export default function App() {
                                 type="button"
                                 className="button button-secondary button-sm"
                                 onClick={() => handleDownloadCertificate(job, 'similarity')}
-                                title="Descargar PDF Similitud"
+                                title="Descargar PDF de Similitud"
                               >
-                                <Download size={13} /> PDF
+                                <Download size={13} /> Similitud
+                              </button>
+                              <button
+                                type="button"
+                                className="button button-secondary button-sm"
+                                onClick={() => handleDownloadCertificate(job, 'ai')}
+                                title="Descargar PDF de IA"
+                              >
+                                <Download size={13} /> IA
+                              </button>
+                              <button
+                                type="button"
+                                className="icon-btn danger"
+                                onClick={() => {
+                                  setJobs((prev) => prev.filter((item) => item.id !== job.id));
+                                  showNotification(`Trabajo #${job.displayCode} eliminado.`);
+                                }}
+                                title="Eliminar documento e informes"
+                              >
+                                <Trash2 size={14} />
                               </button>
                             </div>
                           </td>
@@ -1693,14 +1395,14 @@ export default function App() {
           )}
 
           {/* ==========================================
-              TAB 5: TODAS LAS IA · LABORATORIO ACADÉMICO
+              TAB 4: TODAS LAS IA (NVIDIA)
              ========================================== */}
           {activeTab === 'nvidia' && (
             <div className="ai-studio-layout">
               <aside className="ai-models-sidebar">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <strong style={{ fontSize: 14 }}>Modelos Académicos (NVIDIA)</strong>
-                  <span className="code-chip">{SEED_AI_MODELS.length} destacados</span>
+                  <strong style={{ fontSize: 14 }}>Catálogo Todas las IA</strong>
+                  <span className="code-chip">{SEED_AI_MODELS.length} activos</span>
                 </div>
                 {SEED_AI_MODELS.map((m) => (
                   <button
@@ -1714,9 +1416,7 @@ export default function App() {
                       style={{ color: 'var(--brand-primary)', marginTop: 2, flexShrink: 0 }}
                     />
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <strong style={{ fontSize: 13 }}>{m.name}</strong>
-                      </div>
+                      <strong style={{ fontSize: 13 }}>{m.name}</strong>
                       <span
                         style={{
                           fontSize: 11,
@@ -1741,11 +1441,11 @@ export default function App() {
                       {SEED_AI_MODELS.find((m) => m.model === selectedAiModel)?.name}
                     </strong>
                     <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                      Calibrado para redacción científica, normas APA 7ma edición y análisis de tesis
+                      Chat exclusivo mediante NVIDIA para apoyo en redacción y reducción de similitud
                     </p>
                   </div>
                   <span className="status-pill status-emerald">
-                    Cuota hoy: {aiUsedToday} / 100 consultas
+                    Consultas de hoy: {aiUsedToday} / 100
                   </span>
                 </div>
 
@@ -1763,33 +1463,20 @@ export default function App() {
                     className="prompt-chip"
                     onClick={() =>
                       handleSendChat(
-                        'Parafrasea este párrafo con estilo académico APA 7ma edición para reducir coincidencias en Turnitin.'
+                        'Reescribe este párrafo para reducir el porcentaje de similitud y detección de IA.'
                       )
                     }
                   >
-                    ✨ Parafrasear en APA 7ma sin IA
+                    ✨ Reducir porcentaje de IA y similitud
                   </button>
                   <button
                     type="button"
                     className="prompt-chip"
                     onClick={() =>
-                      handleSendChat(
-                        'Interpreta una correlación Rho de Spearman de 0.782 (p = 0.000) para mi tesis en SPSS.'
-                      )
+                      handleSendChat('Mejora la redacción formal manteniendo las citas APA.')
                     }
                   >
-                    📊 Interpretar Rho de Spearman (SPSS)
-                  </button>
-                  <button
-                    type="button"
-                    className="prompt-chip"
-                    onClick={() =>
-                      handleSendChat(
-                        'Estructura la discusión de resultados comparando mis hallazgos con 3 antecedentes.'
-                      )
-                    }
-                  >
-                    📚 Estructurar Discusión de Resultados
+                    📝 Mejorar redacción formal APA
                   </button>
                 </div>
 
@@ -1804,10 +1491,10 @@ export default function App() {
                     rows={2}
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
-                    placeholder="Pega aquí un párrafo de tu tesis, tabla estadística o consulta metodológica…"
+                    placeholder="Pega aquí el fragmento que deseas reformular antes de volver a pasar por Turnitin…"
                   />
                   <button type="submit" className="button button-primary">
-                    <Send size={15} /> Consultar IA
+                    <Send size={15} /> Enviar
                   </button>
                 </form>
               </section>
@@ -1815,20 +1502,20 @@ export default function App() {
           )}
 
           {/* ==========================================
-              TAB 6: QUILLBOT PREMIUM
+              TAB 5: QUILLBOT
              ========================================== */}
           {activeTab === 'quillbot' && (
             <div className="upload-studio-grid">
               <section className="panel">
                 <div className="panel-header">
                   <div>
-                    <h2>Parafraseador Académico Integrado (QuillBot Pro)</h2>
-                    <p>Reformula fragmentos con alta similitud manteniendo el rigor técnico</p>
+                    <h2>QuillBot · Parafraseador de Apoyo</h2>
+                    <p>Reformula pasajes con coincidencias antes de generar tu informe definitivo</p>
                   </div>
                   <div className="filter-tabs">
                     {[
-                      { id: 'academic', label: 'Académico APA' },
-                      { id: 'humanized', label: 'Humanizado Anti-IA' },
+                      { id: 'academic', label: 'Académico' },
+                      { id: 'humanized', label: 'Natural (Baja IA)' },
                       { id: 'formal', label: 'Formal' },
                       { id: 'concise', label: 'Conciso' },
                     ].map((m) => (
@@ -1846,7 +1533,7 @@ export default function App() {
 
                 <div className="form-grid">
                   <label className="field">
-                    Texto original con coincidencias
+                    Fragmento con coincidencias
                     <textarea
                       rows={6}
                       value={qbInput}
@@ -1854,7 +1541,7 @@ export default function App() {
                     />
                   </label>
                   <label className="field">
-                    Resultado parafraseado sugerido
+                    Texto reformulado
                     <textarea rows={6} readOnly value={qbOutput} />
                   </label>
                 </div>
@@ -1865,17 +1552,17 @@ export default function App() {
                     className="button button-primary"
                     onClick={() => handleQuillbotParaphrase(qbMode)}
                   >
-                    <RefreshCw size={15} /> Regenerar Parafraseo
+                    <RefreshCw size={15} /> Parafrasear
                   </button>
                   <button
                     type="button"
                     className="button button-secondary"
                     onClick={() => {
                       navigator.clipboard?.writeText(qbOutput);
-                      showNotification('Párrafo parafraseado copiado al portapapeles.');
+                      showNotification('Texto copiado al portapapeles.');
                     }}
                   >
-                    <Copy size={15} /> Copiar Resultado
+                    <Copy size={15} /> Copiar
                   </button>
                 </div>
               </section>
@@ -1883,28 +1570,28 @@ export default function App() {
               <section className="panel">
                 <div className="panel-header">
                   <div>
-                    <h2>Credenciales Institucionales QuillBot</h2>
-                    <p>Acceso directo incluido gratuitamente en tu plan activo</p>
+                    <h2>Acceso Directo QuillBot</h2>
+                    <p>QuillBot es gratuito para clientes con cuenta activa</p>
                   </div>
-                  <span className="status-pill status-emerald">Cuenta Verificada</span>
+                  <span className="status-pill status-emerald">Vigente</span>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   <div className="field">
-                    <span>Correo corporativo QuillBot</span>
+                    <span>Correo electrónico</span>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <input
                         type="text"
                         readOnly
-                        value="acceso.investigacion@turnitinpe.com"
+                        value="acceso.quillbot@turnitinpe.com"
                         style={{ flex: 1 }}
                       />
                       <button
                         type="button"
                         className="button button-secondary"
                         onClick={() => {
-                          navigator.clipboard?.writeText('acceso.investigacion@turnitinpe.com');
-                          showNotification('Correo de QuillBot copiado.');
+                          navigator.clipboard?.writeText('acceso.quillbot@turnitinpe.com');
+                          showNotification('Correo electrónico copiado.');
                         }}
                       >
                         <Copy size={14} /> Copiar
@@ -1913,20 +1600,20 @@ export default function App() {
                   </div>
 
                   <div className="field">
-                    <span>Contraseña vigente</span>
+                    <span>Contraseña</span>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <input
                         type="text"
                         readOnly
-                        value="QuillBotPro#2026PE"
+                        value="QuillBot#TurnitinPE2026"
                         style={{ flex: 1 }}
                       />
                       <button
                         type="button"
                         className="button button-secondary"
                         onClick={() => {
-                          navigator.clipboard?.writeText('QuillBotPro#2026PE');
-                          showNotification('Contraseña de QuillBot copiada.');
+                          navigator.clipboard?.writeText('QuillBot#TurnitinPE2026');
+                          showNotification('Contraseña copiada.');
                         }}
                       >
                         <Copy size={14} /> Copiar
@@ -1939,7 +1626,7 @@ export default function App() {
           )}
 
           {/* ==========================================
-              TAB 7: CLIENTES Y ACCESOS (USERS ADMIN)
+              TAB 6: USUARIOS (ADMIN)
              ========================================== */}
           {activeTab === 'users' && (
             <section className="panel">
@@ -1956,14 +1643,14 @@ export default function App() {
                       label: `Administradores (${users.filter((u) => u.role === 'admin').length})`,
                     },
                     {
-                      id: 'expired',
-                      label: `Vencidos (${users.filter((u) => u.status === 'expired').length})`,
-                    },
-                    {
                       id: 'suspended',
                       label: `Suspendidos (${
                         users.filter((u) => u.status === 'suspended').length
                       })`,
+                    },
+                    {
+                      id: 'expired',
+                      label: `Vencidos (${users.filter((u) => u.status === 'expired').length})`,
                     },
                   ].map((tab) => (
                     <button
@@ -1983,7 +1670,7 @@ export default function App() {
                     type="text"
                     value={userSearch}
                     onChange={(e) => setUserSearch(e.target.value)}
-                    placeholder="Buscar cliente por nombre, correo o plan…"
+                    placeholder="Buscar cuenta por nombre, correo o plan…"
                   />
                 </div>
               </div>
@@ -1992,13 +1679,13 @@ export default function App() {
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th>Cliente / Investigador</th>
-                      <th>Plan Asignado</th>
+                      <th>Persona</th>
+                      <th>Plan asignado</th>
                       <th>Estado</th>
-                      <th>Cuota Hoy (Lima)</th>
+                      <th>Cuota diaria (Lima)</th>
                       <th>Dispositivos</th>
                       <th>Originality</th>
-                      <th>Acciones Rápidas</th>
+                      <th>Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2015,7 +1702,7 @@ export default function App() {
                         </td>
                         <td>
                           <span className="code-chip">
-                            {u.role === 'admin' ? 'ADMINISTRADOR' : u.planName || 'ESTUDIANTE PRO'}
+                            {u.role === 'admin' ? 'ADMINISTRADOR' : u.planName || 'Sin plan'}
                           </span>
                         </td>
                         <td>
@@ -2040,13 +1727,13 @@ export default function App() {
                             <span className="status-pill status-blue">Ilimitado</span>
                           ) : (
                             <span className="code-chip">
-                              {u.daily?.remaining ?? 3} / {u.daily?.limit ?? 3} disponibles
+                              {u.daily?.remaining ?? 3} / {u.daily?.limit ?? 3} restantes
                             </span>
                           )}
                         </td>
                         <td>
                           <span className="code-chip">
-                            {u.deviceCount || 1} / {u.deviceLimit || 2} equipos
+                            {u.deviceCount || 1} / {u.deviceLimit || 1}
                           </span>
                         </td>
                         <td>
@@ -2063,7 +1750,9 @@ export default function App() {
                                 )
                               );
                               showNotification(
-                                `Originality ${checked ? 'aprobado' : 'retirado'} para ${u.name}`
+                                `Turnitin Originality ${
+                                  checked ? 'aprobado' : 'deshabilitado'
+                                } para ${u.name}`
                               );
                             }}
                           />
@@ -2079,11 +1768,12 @@ export default function App() {
                                     item.id === u.id ? { ...item, deviceCount: 0 } : item
                                   )
                                 );
-                                showNotification(`Dispositivos liberados para ${u.name}.`);
+                                showNotification(
+                                  `Dispositivos liberados para ${u.name}. El siguiente ingreso registrará el nuevo navegador.`
+                                );
                               }}
-                              title="Liberar dispositivos registrados"
                             >
-                              <Smartphone size={13} /> Liberar
+                              <Smartphone size={13} /> Liberar dispositivos
                             </button>
                             <button
                               type="button"
@@ -2096,30 +1786,28 @@ export default function App() {
                                           ...item,
                                           status: 'active',
                                           daily: {
+                                            ...item.daily,
                                             limit: (item.daily?.limit || 3) + 3,
-                                            consumed: item.daily?.consumed || 0,
                                             remaining: (item.daily?.remaining || 3) + 3,
                                           },
                                         }
                                       : item
                                   )
                                 );
-                                showNotification(`+3 reportes acreditados y cuenta activa: ${u.name}`);
+                                showNotification(`Saldo de +3 reportes acreditado a ${u.name}`);
                               }}
-                              title="Acreditar +3 reportes y renovar"
                             >
-                              <Plus size={13} /> +3 Reportes
+                              <Plus size={13} /> Acreditar +3
                             </button>
                             <a
                               className="button button-secondary button-sm"
                               href={`https://wa.me/51987654321?text=${encodeURIComponent(
-                                `Hola ${u.name}, tu acceso académico en TurnitinPE (${
-                                  u.planName || 'Plan Pro'
-                                }) está listo en https://turnitinpe.com`
+                                `Hola ${u.name}, tu acceso a TurnitinPE (${
+                                  u.planName || 'Reportes IA + Similitud'
+                                }) está activo en https://turnitinpe.com`
                               )}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              title="Enviar acceso por WhatsApp"
                             >
                               <MessageCircle size={13} /> WhatsApp
                             </a>
@@ -2134,7 +1822,7 @@ export default function App() {
           )}
 
           {/* ==========================================
-              TAB 8: PLANES Y PRECIOS
+              TAB 7: PLANES Y PRECIOS
              ========================================== */}
           {activeTab === 'plans' && (
             <div className="plans-grid">
@@ -2148,7 +1836,11 @@ export default function App() {
                     }}
                   >
                     <span className="code-chip">
-                      {plan.modality === 'instructor' ? 'MODALIDAD INSTRUCTOR' : 'MODALIDAD TESISTA'}
+                      {plan.billingMode === 'credits'
+                        ? 'POR CRÉDITOS'
+                        : plan.modality === 'instructor'
+                        ? 'INSTRUCTOR'
+                        : 'ESTUDIANTE'}
                     </span>
                     <span className="status-pill status-emerald">Activo</span>
                   </div>
@@ -2162,23 +1854,25 @@ export default function App() {
 
                   <div className="plan-price-row">
                     <strong>{formatCurrency(plan.priceMinor, plan.currency)}</strong>
-                    <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>/ mes</span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+                      / {plan.interval === 'once' ? 'pago único' : 'mes'}
+                    </span>
                   </div>
 
                   <ul className="plan-features-list">
                     <li>
                       <CheckCircle2 size={15} style={{ color: 'var(--emerald)' }} />
-                      {plan.feedbackPolicy?.mode === 'unlimited'
-                        ? 'Informes PDF ilimitados por día'
-                        : `${plan.feedbackPolicy?.dailyLimit || 7} informes PDF diarios (IA + Similitud)`}
+                      {plan.feedbackPolicy?.mode === 'credits'
+                        ? '1 crédito por PDF · IA + Similitud'
+                        : `${plan.feedbackPolicy?.dailyLimit || 7} PDF por día · IA + Similitud`}
                     </li>
                     <li>
                       <CheckCircle2 size={15} style={{ color: 'var(--emerald)' }} />
-                      Aulas Sin Depósito (No Repository)
+                      Turnitin Feedback habilitado (Sin depósito)
                     </li>
                     <li>
                       <CheckCircle2 size={15} style={{ color: 'var(--emerald)' }} />
-                      QuillBot Premium + Laboratorio NVIDIA IA
+                      QuillBot incluido gratuitamente
                     </li>
                     <li>
                       <Users size={15} style={{ color: 'var(--brand-primary)' }} />
@@ -2191,102 +1885,28 @@ export default function App() {
           )}
 
           {/* ==========================================
-              TAB 9: HISTORIAL DE CUOTAS (DAILY LIMITS LIMA)
-             ========================================== */}
-          {activeTab === 'daily-limits' && (
-            <section className="panel">
-              <div className="panel-header">
-                <div>
-                  <h2>Control Diario de Reportes (Zona Horaria America/Lima)</h2>
-                  <p>Reinicio automático a las 00:00 hrs (Lima) · Acredita unidades extra en 1 clic</p>
-                </div>
-                <span className="code-chip">Fecha Lima: 2026-11-08</span>
-              </div>
-
-              <div className="table-wrap">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Cliente</th>
-                      <th>Correo</th>
-                      <th>Cuota Base</th>
-                      <th>Consumidos Hoy</th>
-                      <th>Disponibles</th>
-                      <th>Acción</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {users
-                      .filter((u) => u.role !== 'admin')
-                      .map((u) => (
-                        <tr key={u.id}>
-                          <td>
-                            <strong>{u.name}</strong>
-                          </td>
-                          <td>{u.email}</td>
-                          <td>
-                            <span className="code-chip">{u.daily?.limit ?? 3} reportes</span>
-                          </td>
-                          <td>{u.daily?.consumed ?? 0}</td>
-                          <td>
-                            <span className="status-pill status-emerald">
-                              {u.daily?.remaining ?? 3} restantes
-                            </span>
-                          </td>
-                          <td>
-                            <button
-                              type="button"
-                              className="button button-primary button-sm"
-                              onClick={() => {
-                                setUsers((prev) =>
-                                  prev.map((item) =>
-                                    item.id === u.id
-                                      ? {
-                                          ...item,
-                                          daily: {
-                                            limit: (item.daily?.limit || 3) + 5,
-                                            consumed: item.daily?.consumed || 0,
-                                            remaining: (item.daily?.remaining || 3) + 5,
-                                          },
-                                        }
-                                      : item
-                                  )
-                                );
-                                showNotification(`Se acreditaron +5 reportes hoy para ${u.name}.`);
-                              }}
-                            >
-                              <Plus size={13} /> Acreditar +5 hoy
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          )}
-
-          {/* ==========================================
-              TAB 10: ESTACIONES CHROME Y CONFIGURACIÓN
+              TAB 8: CONFIGURACIÓN DE TURNITIN
              ========================================== */}
           {activeTab === 'turnitin-settings' && (
             <div className="upload-studio-grid">
               <section className="panel">
                 <div className="panel-header">
                   <div>
-                    <h2>Vinculaciones de Estación Chrome (OriginalityPlus)</h2>
-                    <p>26 vinculaciones históricas · Nodos encargados de emitir los PDF oficiales</p>
+                    <h2>Vinculaciones Chrome · Proveedor OriginalityPlus</h2>
+                    <p>Estaciones conectadas para procesar los informes PDF de IA y Similitud</p>
                   </div>
                   <button
                     type="button"
                     className="button button-primary button-sm"
                     onClick={() => {
-                      const tok = `tpe_live_station_${Math.random().toString(36).slice(2, 10)}_7d`;
+                      const tok = `tpe_chrome_bind_${Math.random().toString(36).slice(2, 10)}_7d`;
                       setGeneratedToken(tok);
-                      showNotification('Nuevo token de vinculación Chrome (7 días) generado.');
+                      showNotification(
+                        'Vinculación generada (7 días). Guarda este token en la extensión.'
+                      );
                     }}
                   >
-                    <KeyRound size={14} /> Generar Token (7 días)
+                    <KeyRound size={14} /> Generar vinculación (7 días)
                   </button>
                 </div>
 
@@ -2306,7 +1926,7 @@ export default function App() {
                   >
                     <div>
                       <strong style={{ fontSize: 13, display: 'block' }}>
-                        Token para Extensión Chrome (Válido por 7 días):
+                        Guarda este token en la extensión Chrome (Solo se muestra ahora):
                       </strong>
                       <code style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>
                         {generatedToken}
@@ -2317,10 +1937,10 @@ export default function App() {
                       className="button button-secondary button-sm"
                       onClick={() => {
                         navigator.clipboard?.writeText(generatedToken);
-                        showNotification('Token copiado al portapapeles.');
+                        showNotification('Token copiado.');
                       }}
                     >
-                      <Copy size={13} /> Copiar Token
+                      <Copy size={13} /> Copiar
                     </button>
                   </div>
                 )}
@@ -2343,7 +1963,7 @@ export default function App() {
                         <strong>{b.name}</strong>
                         <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                           Proveedor: <strong>{b.provider}</strong> · Último latido: {b.lastSeen} ·
-                          Procesados hoy: {b.processedToday}
+                          Trabajos hoy: {b.processedToday}
                         </p>
                       </div>
                       <span
@@ -2351,7 +1971,7 @@ export default function App() {
                           b.status === 'online' ? 'status-emerald' : 'status-amber'
                         }`}
                       >
-                        {b.status === 'online' ? 'Conectada' : 'En espera'}
+                        {b.status === 'online' ? 'Activa' : 'En espera'}
                       </span>
                     </div>
                   ))}
@@ -2361,29 +1981,27 @@ export default function App() {
               <section className="panel">
                 <div className="panel-header">
                   <div>
-                    <h2>Política de Conservación y Privacidad</h2>
-                    <p>Protección de tesis y manuscritos inéditos</p>
+                    <h2>Conservación y Procesamiento</h2>
+                    <p>Políticas de retención de documentos e informes</p>
                   </div>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 13.5 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   <div className="filter-switch-item">
                     <CheckCircle2 size={18} style={{ color: 'var(--emerald)', flexShrink: 0 }} />
                     <div>
-                      <strong>Depósito Cero (No Repository Garantizado)</strong>
+                      <strong>Los informes nunca se eliminan automáticamente</strong>
                       <p style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>
-                        Ningún documento subido por clientes o instructores se guarda en la base de
-                        datos global de Turnitin, evitando el autoplagio en futuras revisiones
-                        universitarias.
+                        Los reportes PDF generados permanecen disponibles en la cuenta del cliente.
                       </p>
                     </div>
                   </div>
                   <div className="filter-switch-item">
                     <CheckCircle2 size={18} style={{ color: 'var(--emerald)', flexShrink: 0 }} />
                     <div>
-                      <strong>Eliminación Manual Habilitada para Clientes</strong>
+                      <strong>Eliminación por el cliente habilitada</strong>
                       <p style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>
-                        El tesista o asesor puede eliminar su archivo y certificados en cualquier
-                        momento desde su bandeja personal.
+                        El cliente puede eliminar su documento e informes cuando haya terminado de
+                        descargarlos.
                       </p>
                     </div>
                   </div>
@@ -2393,14 +2011,14 @@ export default function App() {
           )}
 
           {/* ==========================================
-              TAB 11: AUDITORÍA EN VIVO (ACTIVITY)
+              TAB 9: HISTORIAL DE CUOTAS (DAILY LIMITS)
              ========================================== */}
-          {activeTab === 'activity' && (
+          {activeTab === 'daily-limits' && (
             <section className="panel">
               <div className="panel-header">
                 <div>
-                  <h2>Registro de Actividad y Auditoría</h2>
-                  <p>Eventos recientes en tiempo real del espacio TurnitinPE</p>
+                  <h2>Historial de cuotas de reportes (Día en Lima: 2026-11-08)</h2>
+                  <p>Acredita saldo de reportes confirmado o ajusta el límite diario individual</p>
                 </div>
               </div>
 
@@ -2408,11 +2026,135 @@ export default function App() {
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th>Actor / Usuario</th>
+                      <th>Cliente</th>
+                      <th>Correo</th>
+                      <th>Límite Configurado</th>
+                      <th>Consumidos Hoy</th>
+                      <th>Reservas</th>
+                      <th>Restantes</th>
+                      <th>Acreditar saldo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {users
+                      .filter((u) => u.role !== 'admin')
+                      .map((u) => (
+                        <tr key={u.id}>
+                          <td>
+                            <strong>{u.name}</strong>
+                          </td>
+                          <td>{u.email}</td>
+                          <td>
+                            <span className="code-chip">{u.daily?.limit ?? 3} PDF / día</span>
+                          </td>
+                          <td>{u.daily?.consumed ?? 0}</td>
+                          <td>{u.daily?.reserved ?? 0}</td>
+                          <td>
+                            <span className="status-pill status-emerald">
+                              {u.daily?.remaining ?? 3} disponibles
+                            </span>
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              className="button button-primary button-sm"
+                              onClick={() => {
+                                setUsers((prev) =>
+                                  prev.map((item) =>
+                                    item.id === u.id
+                                      ? {
+                                          ...item,
+                                          daily: {
+                                            ...item.daily,
+                                            limit: (item.daily?.limit || 3) + 5,
+                                            remaining: (item.daily?.remaining || 3) + 5,
+                                          },
+                                        }
+                                      : item
+                                  )
+                                );
+                                showNotification(`Se acreditaron +5 reportes a ${u.name}.`);
+                              }}
+                            >
+                              <Plus size={13} /> Acreditar +5 reportes
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+
+          {/* ==========================================
+              TAB 10: ARCHIVOS DE CLIENTES (CLIENT UPLOADS)
+             ========================================== */}
+          {activeTab === 'client-uploads' && (
+            <section className="panel">
+              <div className="panel-header">
+                <div>
+                  <h2>Archivos subidos por clientes</h2>
+                  <p>Resumen de almacenamiento y entregas registradas por cuenta</p>
+                </div>
+              </div>
+
+              <div className="table-wrap">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Cliente</th>
+                      <th>Correo</th>
+                      <th>Documentos Subidos</th>
+                      <th>Volumen Total</th>
+                      <th>Pendientes</th>
+                      <th>Última Carga</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {clientUploads.map((item) => (
+                      <tr key={item.id}>
+                        <td>
+                          <strong>{item.name}</strong>
+                        </td>
+                        <td>{item.email}</td>
+                        <td>
+                          <span className="code-chip">{item.count} archivos</span>
+                        </td>
+                        <td>{(item.bytes / 1024).toFixed(1)} KB</td>
+                        <td>{item.pending}</td>
+                        <td style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>
+                          {new Date(item.lastUpload).toLocaleString('es-PE')}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+
+          {/* ==========================================
+              TAB 11: ACTIVIDAD / AUDITORÍA
+             ========================================== */}
+          {activeTab === 'activity' && (
+            <section className="panel">
+              <div className="panel-header">
+                <div>
+                  <h2>Auditoría y Actividad del Espacio</h2>
+                  <p>Registro cronológico de inicios de sesión y respuestas de la estación Chrome</p>
+                </div>
+              </div>
+
+              <div className="table-wrap">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Persona / Estación</th>
                       <th>Rol</th>
-                      <th>Acción Registrada</th>
-                      <th>Recurso / Destino</th>
-                      <th>Fecha y Hora (Lima)</th>
+                      <th>Acción</th>
+                      <th>Recurso</th>
+                      <th>Fecha y hora (Lima)</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2442,7 +2184,7 @@ export default function App() {
         </main>
       </div>
 
-      {/* Interactive Report Viewer Modal */}
+      {/* Report Viewer Modal */}
       {selectedJobForReport && (
         <ReportViewerModal
           job={selectedJobForReport}
@@ -2451,113 +2193,14 @@ export default function App() {
         />
       )}
 
-      {/* Create Course Modal */}
-      {showNewCourseModal && (
-        <div className="modal-backdrop" onClick={() => setShowNewCourseModal(false)}>
-          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <div>
-                <span className="page-eyebrow">NUEVA AULA ACADÉMICA SIN DEPÓSITO</span>
-                <h2>Crear Curso o Seminario de Tesis</h2>
-              </div>
-              <button className="icon-btn" onClick={() => setShowNewCourseModal(false)}>
-                <X size={18} />
-              </button>
-            </div>
-
-            <form
-              onSubmit={handleCreateCourse}
-              style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
-            >
-              <div className="form-grid">
-                <label className="field">
-                  Código del curso
-                  <input
-                    type="text"
-                    value={newCourseForm.code}
-                    onChange={(e) => setNewCourseForm({ ...newCourseForm, code: e.target.value })}
-                    required
-                  />
-                </label>
-                <label className="field">
-                  Facultad / Escuela
-                  <input
-                    type="text"
-                    value={newCourseForm.institution}
-                    onChange={(e) =>
-                      setNewCourseForm({ ...newCourseForm, institution: e.target.value })
-                    }
-                    required
-                  />
-                </label>
-              </div>
-
-              <label className="field">
-                Nombre del Curso o Taller de Tesis
-                <input
-                  type="text"
-                  value={newCourseForm.title}
-                  onChange={(e) => setNewCourseForm({ ...newCourseForm, title: e.target.value })}
-                  placeholder="Ej. Tesis Doctoral en Educación y Gestión Universitaria"
-                  required
-                />
-              </label>
-
-              <div className="form-grid">
-                <label className="field">
-                  Umbral máx. Similitud (%)
-                  <input
-                    type="number"
-                    min="5"
-                    max="40"
-                    value={newCourseForm.maxSimilarityThreshold}
-                    onChange={(e) =>
-                      setNewCourseForm({
-                        ...newCourseForm,
-                        maxSimilarityThreshold: e.target.value,
-                      })
-                    }
-                  />
-                </label>
-                <label className="field">
-                  Umbral máx. Escritura IA (%)
-                  <input
-                    type="number"
-                    min="5"
-                    max="40"
-                    value={newCourseForm.maxAiThreshold}
-                    onChange={(e) =>
-                      setNewCourseForm({ ...newCourseForm, maxAiThreshold: e.target.value })
-                    }
-                  />
-                </label>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
-                <button
-                  type="button"
-                  className="button button-secondary"
-                  onClick={() => setShowNewCourseModal(false)}
-                >
-                  Cancelar
-                </button>
-                <button type="submit" className="button button-primary">
-                  Crear Aula Académica
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
       {/* Create User Modal */}
       {showNewUserModal && (
         <div className="modal-backdrop" onClick={() => setShowNewUserModal(false)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div>
-                <span className="page-eyebrow">NUEVO ACCESO AL ESPACIO</span>
-                <h2>Crear Cuenta de Cliente / Investigador</h2>
+                <span className="page-eyebrow">NUEVA CUENTA DE CLIENTE</span>
+                <h2>Crear cuenta</h2>
               </div>
               <button className="icon-btn" onClick={() => setShowNewUserModal(false)}>
                 <X size={18} />
@@ -2569,30 +2212,30 @@ export default function App() {
               style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
             >
               <label className="field">
-                Nombre completo del cliente
+                Nombre completo
                 <input
                   type="text"
                   value={newUserForm.name}
                   onChange={(e) => setNewUserForm({ ...newUserForm, name: e.target.value })}
-                  placeholder="Ej. Dra. María Fernanda Quispe"
+                  placeholder="Nombre del cliente"
                   required
                 />
               </label>
 
               <label className="field">
-                Correo electrónico de acceso
+                Correo electrónico
                 <input
                   type="email"
                   value={newUserForm.email}
                   onChange={(e) => setNewUserForm({ ...newUserForm, email: e.target.value })}
-                  placeholder="maria.quispe@unmsm.edu.pe"
+                  placeholder="cliente@correo.com"
                   required
                 />
               </label>
 
               <div className="form-grid">
                 <label className="field">
-                  Plan contratado
+                  Plan asignado
                   <select
                     value={newUserForm.planId}
                     onChange={(e) => setNewUserForm({ ...newUserForm, planId: e.target.value })}
@@ -2610,7 +2253,7 @@ export default function App() {
                   <input
                     type="number"
                     min="1"
-                    max="10"
+                    max="20"
                     value={newUserForm.deviceLimit}
                     onChange={(e) =>
                       setNewUserForm({ ...newUserForm, deviceLimit: e.target.value })
@@ -2628,7 +2271,7 @@ export default function App() {
                   Cancelar
                 </button>
                 <button type="submit" className="button button-primary">
-                  Crear Cuenta y Habilitar Acceso
+                  Crear cuenta
                 </button>
               </div>
             </form>
@@ -2642,8 +2285,8 @@ export default function App() {
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div>
-                <span className="page-eyebrow">CATÁLOGO COMERCIAL</span>
-                <h2>Crear Nuevo Plan</h2>
+                <span className="page-eyebrow">PLANES Y PRECIOS</span>
+                <h2>Crear plan</h2>
               </div>
               <button className="icon-btn" onClick={() => setShowNewPlanModal(false)}>
                 <X size={18} />
@@ -2655,19 +2298,19 @@ export default function App() {
               style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
             >
               <label className="field">
-                Nombre del Plan
+                Nombre del plan
                 <input
                   type="text"
                   value={newPlanForm.name}
                   onChange={(e) => setNewPlanForm({ ...newPlanForm, name: e.target.value })}
-                  placeholder="Ej. TESISTA DOCTORAL PRO"
+                  placeholder="Ej. INSTRUCTOR PRO"
                   required
                 />
               </label>
 
               <div className="form-grid">
                 <label className="field">
-                  Precio mensual (Soles PEN)
+                  Precio en Soles (PEN)
                   <input
                     type="text"
                     value={newPlanForm.pricePen}
@@ -2676,7 +2319,7 @@ export default function App() {
                   />
                 </label>
                 <label className="field">
-                  Cuota diaria de informes PDF
+                  PDFs diarios incluidos (IA + Similitud)
                   <input
                     type="number"
                     min="1"
@@ -2690,14 +2333,14 @@ export default function App() {
               </div>
 
               <label className="field">
-                Descripción comercial
+                Descripción
                 <textarea
                   rows={3}
                   value={newPlanForm.description}
                   onChange={(e) =>
                     setNewPlanForm({ ...newPlanForm, description: e.target.value })
                   }
-                  placeholder="Acceso completo a aulas sin depósito, certificados IA + Similitud y QuillBot."
+                  placeholder="Informes PDF diarios de Similitud e IA sin depósito."
                 />
               </label>
 
@@ -2710,7 +2353,7 @@ export default function App() {
                   Cancelar
                 </button>
                 <button type="submit" className="button button-primary">
-                  Guardar Plan
+                  Guardar plan
                 </button>
               </div>
             </form>

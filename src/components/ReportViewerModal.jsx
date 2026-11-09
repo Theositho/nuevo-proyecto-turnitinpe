@@ -5,10 +5,6 @@ import {
   ShieldCheck,
   Sparkles,
   FileText,
-  CheckCircle2,
-  AlertTriangle,
-  ExternalLink,
-  BookOpen,
 } from 'lucide-react';
 
 export default function ReportViewerModal({ job, onClose, onDownloadCertificate }) {
@@ -36,17 +32,17 @@ export default function ReportViewerModal({ job, onClose, onDownloadCertificate 
         className="modal-card wide"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
-        aria-label={`Certificado Turnitin ${job.name}`}
+        aria-label={`Reporte Turnitin ${job.name}`}
       >
         <div className="modal-header">
           <div>
             <span className="page-eyebrow">
-              CERTIFICADO DE INTEGRIDAD ACADÉMICA · ID #{job.displayCode}
+              REPORTE OFICIAL DE IA Y SIMILITUD · CÓDIGO #{job.displayCode}
             </span>
             <h2>{job.name}</h2>
             <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 4 }}>
-              Autor: <strong>{job.author || job.ownerName}</strong> · Aula:{' '}
-              <strong>{job.courseCode || 'POS-2026-II'}</strong> · Extensión:{' '}
+              Cliente: <strong>{job.ownerName}</strong> ({job.ownerEmail}) · Proveedor:{' '}
+              <strong>OriginalityPlus</strong> · Extensión:{' '}
               <strong>{job.pages || 45} págs.</strong> ({(job.words || 12400).toLocaleString('es-PE')}{' '}
               palabras)
             </p>
@@ -76,17 +72,17 @@ export default function ReportViewerModal({ job, onClose, onDownloadCertificate 
           >
             <div>
               <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>
-                ÍNDICE DE SIMILITUD
+                REPORTE DE SIMILITUD
               </span>
               <div style={{ fontSize: 32, fontWeight: 800, fontFamily: 'var(--font-display)' }}>
                 {job.similarityScore}%
               </div>
               <span className={`status-pill ${simColor}`}>
                 {job.similarityScore <= 15
-                  ? 'Aprobado (<15%)'
+                  ? 'Baja similitud (<15%)'
                   : job.similarityScore <= 20
-                  ? 'Rango aceptable'
-                  : 'Requiere citación'}
+                  ? 'Rango moderado'
+                  : 'Similitud elevada'}
               </span>
             </div>
             <ShieldCheck size={38} style={{ color: 'var(--brand-primary)', opacity: 0.85 }} />
@@ -105,13 +101,13 @@ export default function ReportViewerModal({ job, onClose, onDownloadCertificate 
           >
             <div>
               <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>
-                ESCRITURA POR IA DETECTADA
+                REPORTE DE DETECCIÓN DE IA
               </span>
               <div style={{ fontSize: 32, fontWeight: 800, fontFamily: 'var(--font-display)' }}>
                 {job.aiScore === 0 ? '0% *' : `${job.aiScore}%`}
               </div>
               <span className={`status-pill ${aiColor}`}>
-                {job.aiScore <= 10 ? 'Redacción humana verificada' : 'Revisar fragmentos'}
+                {job.aiScore <= 10 ? 'Escritura humana verificada' : 'Coincidencia de IA detectada'}
               </span>
             </div>
             <Sparkles size={38} style={{ color: 'var(--emerald)', opacity: 0.85 }} />
@@ -129,13 +125,13 @@ export default function ReportViewerModal({ job, onClose, onDownloadCertificate 
             }}
           >
             <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>
-              MODALIDAD DE DEPÓSITO
+              PRIVACIDAD DEL ARCHIVO
             </span>
             <strong style={{ fontSize: 14.5, color: 'var(--emerald)' }}>
               Sin Depósito (No Repository)
             </strong>
             <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-              El documento NO queda indexado en la base de datos de Turnitin.
+              Tu documento no queda guardado en el repositorio de Turnitin.
             </span>
           </div>
         </div>
@@ -146,13 +142,13 @@ export default function ReportViewerModal({ job, onClose, onDownloadCertificate 
               className={`filter-tab ${activeTab === 'both' ? 'active' : ''}`}
               onClick={() => setActiveTab('both')}
             >
-              Resumen de Fuentes y Extracto
+              Fuentes Detectadas y Vista Previa
             </button>
             <button
               className={`filter-tab ${activeTab === 'filters' ? 'active' : ''}`}
               onClick={() => setActiveTab('filters')}
             >
-              Filtros Aplicados y Metadatos
+              Detalles Técnicos del Trabajo
             </button>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -168,7 +164,7 @@ export default function ReportViewerModal({ job, onClose, onDownloadCertificate 
               onClick={() => onDownloadCertificate(job, 'ai')}
             >
               <Download size={14} />
-              Descargar Certificado IA ({job.aiScore}%)
+              Descargar PDF IA ({job.aiScore}%)
             </button>
           </div>
         </div>
@@ -202,7 +198,7 @@ export default function ReportViewerModal({ job, onClose, onDownloadCertificate 
                 }}
               >
                 <strong style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <BookOpen size={15} /> Vista previa de coincidencias en el manuscrito
+                  <FileText size={15} /> Extracto analizado en el documento
                 </strong>
                 <span className="code-chip">Pág. 14 de {job.pages || 45}</span>
               </div>
@@ -225,10 +221,9 @@ export default function ReportViewerModal({ job, onClose, onDownloadCertificate 
                 en evidencia empírica.
               </p>
               <p>
-                Asimismo, el análisis estadístico mediante el coeficiente Rho de Spearman demostró
-                una correlación positiva y significativa (r = 0.784, p &lt; 0.001) entre las
-                dimensiones evaluadas, confirmando la hipótesis general de la investigación sin
-                alterar la originalidad conceptual del autor.
+                Asimismo, el análisis estadístico demostró una correlación positiva y significativa
+                entre las dimensiones evaluadas, confirmando la consistencia metodológica del
+                documento revisado.
               </p>
             </div>
 
@@ -242,7 +237,7 @@ export default function ReportViewerModal({ job, onClose, onDownloadCertificate 
                 gap: 10,
               }}
             >
-              <strong style={{ fontSize: 13.5 }}>Fuentes principales detectadas</strong>
+              <strong style={{ fontSize: 13.5 }}>Fuentes de similitud encontradas</strong>
               {(job.sources || []).map((s, idx) => (
                 <div
                   key={idx}
@@ -280,23 +275,25 @@ export default function ReportViewerModal({ job, onClose, onDownloadCertificate 
             }}
           >
             <div>
-              <strong>Exclusión de bibliografía:</strong> Activa (APA 7ma Ed. / IEEE / Vancouver)
+              <strong>Archivo PDF IA:</strong>{' '}
+              <code>{job.reportNames?.ai || `ai-${job.id}.pdf`}</code>
             </div>
             <div>
-              <strong>Exclusión de citas entrecomilladas:</strong> Activa
+              <strong>Archivo PDF Similitud:</strong>{' '}
+              <code>{job.reportNames?.similarity || `sim-${job.id}.pdf`}</code>
             </div>
             <div>
-              <strong>Coincidencias menores:</strong> Excluidas (&lt; 10 palabras)
+              <strong>Filtros de exclusión:</strong> Bibliografía y citas excluidas
             </div>
             <div>
-              <strong>Motor de procesamiento:</strong> OriginalityPlus v2 · Estación Lima
+              <strong>Proveedor de estación:</strong> OriginalityPlus · Estación Chrome
             </div>
             <div>
-              <strong>Fecha de emisión (Lima):</strong>{' '}
+              <strong>Fecha de envío (Lima):</strong>{' '}
               {new Date(job.createdAt).toLocaleString('es-PE')}
             </div>
             <div>
-              <strong>Firma de verificación:</strong> SHA256-TII-{job.displayCode}-PE
+              <strong>Estado de conservación:</strong> Sin eliminación automática
             </div>
           </div>
         )}
