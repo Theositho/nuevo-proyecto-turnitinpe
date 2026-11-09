@@ -70,6 +70,27 @@ function getInitials(name = '') {
   );
 }
 
+function TurnitinSymbol() {
+  return (
+    <svg
+      className="brand-symbol"
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="-1 -0.811157 37.211701 60.851957"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M2.41016 22.1038L1.64596 26.9639H9.37611C3.29193 32.4721 0 41.0436 0 46.5812C0 50.6755 1.29326 53.8567 3.90916 56.0364C5.99601 57.8037 8.87645 58.7757 12.4623 59.0114L12.815 59.0408V57.3324L12.5505 57.2735C9.28794 56.5371 3.85038 54.3574 3.79159 47.7299C3.7622 42.7814 8.84705 33.5324 14.7255 29.6443L13.1677 38.6282H18.135L20.9272 22.1332L2.41016 22.1038Z"
+        fill="#0096FF"
+      />
+      <path
+        d="M7.23033 0.188843C4.67321 0.188843 2.58636 2.28018 2.55697 4.81334L2.38062 17.8326L5.05531 17.8621H7.7006L7.84757 5.52027H29.7154L29.8623 38.9521H22.867L21.9558 44.2836H30.509C33.0661 44.2836 35.1823 41.9566 35.2117 39.394L35.1235 0.188843H7.23033Z"
+        fill="#0096FF"
+      />
+    </svg>
+  );
+}
+
 export default function App() {
   const [theme, setTheme] = useState('light');
   const [user, setUser] = useState(SEED_ADMIN_USER);
@@ -515,7 +536,7 @@ export default function App() {
         <section className="auth-story">
           <div className="auth-story-header">
             <div className="brand brand-dark">
-              <img className="brand-symbol" src="/turnitin-symbol.svg" alt="" />
+              <TurnitinSymbol />
               <span>turnitinpe</span>
               <span className="brand-badge">Academic Pro v2.0</span>
             </div>
@@ -570,7 +591,7 @@ export default function App() {
           <div className="auth-card">
             <div className="auth-card-top">
               <div className="brand">
-                <img className="brand-symbol" src="/turnitin-symbol.svg" alt="" />
+                <TurnitinSymbol />
                 <span>turnitinpe</span>
               </div>
               <span className="status-pill status-emerald">Estación en línea</span>
@@ -813,7 +834,7 @@ export default function App() {
       <aside className={`sidebar ${mobileNavOpen ? 'open' : ''}`}>
         <div className="sidebar-brand">
           <div className="brand brand-dark">
-            <img className="brand-symbol" src="/turnitin-symbol.svg" alt="" />
+            <TurnitinSymbol />
             <span>turnitinpe</span>
             <span className="brand-badge">PRO</span>
           </div>
