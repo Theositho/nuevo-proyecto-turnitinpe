@@ -465,8 +465,8 @@ export default function App() {
 
   const filteredJobs = useMemo(() => {
     return jobs.filter((j) => {
-      if (jobKindFilter === 'low' && j.similarityScore > 15) return false;
-      if (jobKindFilter === 'high' && j.similarityScore <= 15 && j.aiScore <= 15) return false;
+      if (jobKindFilter === 'similarity' && !(j.kinds || []).includes('similarity')) return false;
+      if (jobKindFilter === 'ai' && !(j.kinds || []).includes('ai')) return false;
       const q = jobSearch.trim().toLowerCase();
       if (!q) return true;
       return (
@@ -1305,254 +1305,216 @@ export default function App() {
           )}
 
           {/* ==========================================
-              TAB 2 & 3: TURNITIN FEEDBACK & ORIGINALITY
+              TAB 2 & 3: TURNITIN FEEDBACK & ORIGINALITY (EXACT CLIENT VIEW)
              ========================================== */}
           {(activeTab === 'turnitin2' || activeTab === 'documents') && (
             <>
-              <div className="upload-studio-grid">
-                {/* Upload Form */}
-                <section className="panel">
-                  <div className="panel-header">
-                    <div>
-                      <h2>
-                        {activeTab === 'documents'
-                          ? 'Subir a Turnitin Originality (Independiente)'
-                          : 'Subir a Turnitin Feedback (IA + Similitud)'}
-                      </h2>
-                      <p>
-                        Subida fragmentada por bloques de 1 MB hasta 100 MB · Sin indexación en
-                        repositorio.
-                      </p>
-                    </div>
-                    <span className="status-pill status-emerald">
-                      {activeTab === 'documents'
-                        ? 'Modo Independiente · Sin límite diario'
-                        : '1 crédito por documento · IA + Similitud'}
-                    </span>
-                  </div>
-
-                  <form
-                    onSubmit={handleFileUploadSubmit}
-                    style={{ display: 'flex', flexDirection: 'column', gap: 16 }}
-                  >
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".pdf,.docx"
-                      style={{ display: 'none' }}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) setUploadFileName(file.name);
+              {/* Plan Summary Bar (Matches turnitinpe.com t2-summary) */}
+              <div className="bs-summary-alert">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span className="metric-icon metric-blue">
+                    <FileText size={18} />
+                  </span>
+                  <div>
+                    <small
+                      style={{
+                        display: 'block',
+                        fontSize: 11,
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        color: 'var(--text-muted)',
                       }}
-                    />
-
-                    <div
-                      className="dropzone"
-                      onClick={() => fileInputRef.current?.click()}
-                      role="button"
-                      tabIndex={0}
                     >
-                      <div className="dropzone-icon">
-                        <Upload size={24} />
-                      </div>
-                      <div>
-                        <strong style={{ fontSize: 15, display: 'block' }}>
-                          {uploadFileName
-                            ? `Archivo seleccionado: ${uploadFileName}`
-                            : 'Arrastra tu archivo PDF aquí o haz clic para seleccionar desde tu PC'}
-                        </strong>
-                        <span style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>
-                          Hasta 100 MB por documento · Entrega simultánea de sim-*.pdf y ai-*.pdf
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="form-grid">
-                      <label className="field">
-                        Nombre del documento (opcional)
-                        <input
-                          type="text"
-                          value={uploadFileName}
-                          onChange={(e) => setUploadFileName(e.target.value)}
-                          placeholder="Ej. proyectofin_26.corregido1.pdf"
-                        />
-                      </label>
-
-                      <label className="field">
-                        Tipo de informe solicitado
-                        <select
-                          value={uploadReportMode}
-                          onChange={(e) => setUploadReportMode(e.target.value)}
-                        >
-                          <option value="both">IA + Similitud (Ambos informes PDF)</option>
-                          <option value="similarity">Solo Similitud (sim-*.pdf)</option>
-                          <option value="ai">Solo Detección de IA (ai-*.pdf)</option>
-                        </select>
-                      </label>
-                    </div>
-
-                    {isUploading && (
-                      <div className="pipeline-stepper">
-                        <div
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            fontSize: 12.5,
-                            fontWeight: 700,
-                          }}
-                        >
-                          <span>
-                            Procesando en Estación Chrome (
-                            {activeProvider === 'academiacx' ? 'AcademiaCX' : 'OriginalityPlus'})…
-                          </span>
-                          <span>{uploadProgress}%</span>
-                        </div>
-                        <div className="pipeline-progress-track">
-                          <div
-                            className="pipeline-progress-fill"
-                            style={{ width: `${uploadProgress}%` }}
-                          />
-                        </div>
-                        <div className="pipeline-steps-row">
-                          <div
-                            className={`pipeline-step ${
-                              uploadStage === 1 ? 'active' : uploadStage > 1 ? 'done' : ''
-                            }`}
-                          >
-                            <strong>1. Subida Chunked</strong>
-                            <span>Bloques 1 MB · SHA256</span>
-                          </div>
-                          <div
-                            className={`pipeline-step ${
-                              uploadStage === 2 ? 'active' : uploadStage > 2 ? 'done' : ''
-                            }`}
-                          >
-                            <strong>2. Cuota Lima</strong>
-                            <span>Reserva America/Lima</span>
-                          </div>
-                          <div
-                            className={`pipeline-step ${
-                              uploadStage === 3 ? 'active' : uploadStage > 3 ? 'done' : ''
-                            }`}
-                          >
-                            <strong>3. Estación Chrome</strong>
-                            <span>Leasing OriginalityPlus</span>
-                          </div>
-                          <div className={`pipeline-step ${uploadStage === 4 ? 'done' : ''}`}>
-                            <strong>4. Certificados PDF</strong>
-                            <span>sim-*.pdf + ai-*.pdf</span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                      <button
-                        type="submit"
-                        className="button button-primary"
-                        disabled={isUploading}
-                      >
-                        <FileCheck2 size={16} />
-                        {isUploading ? 'Procesando en estación…' : 'Enviar documento a análisis'}
-                      </button>
-                      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                        Detección de IA ilimitada · Los informes nunca se indexan en repositorio.
-                      </span>
-                    </div>
-                  </form>
-                </section>
-
-                {/* Similarity Filters */}
-                <section className="panel">
-                  <div className="panel-header">
-                    <div>
-                      <h2>Filtros del Informe de Similitud</h2>
-                      <p>Configura las exclusiones antes de enviar tu documento</p>
-                    </div>
-                    <Sliders size={18} style={{ color: 'var(--brand-primary)' }} />
+                      Tu plan
+                    </small>
+                    <strong style={{ fontSize: 14.5 }}>
+                      {activeTab === 'documents'
+                        ? 'Turnitin Originality · Envíos independientes habilitados'
+                        : isAdminView
+                        ? 'Documentos ilimitados · 1 crédito por documento (IA + Similitud)'
+                        : '7 de 7 documentos disponibles hoy · Incluye IA + Similitud'}
+                    </strong>
                   </div>
-
-                  <div className="filter-switches">
-                    <label className="filter-switch-item">
-                      <input
-                        type="checkbox"
-                        checked={excludeBib}
-                        onChange={(e) => setExcludeBib(e.target.checked)}
-                      />
-                      <div>
-                        <strong style={{ display: 'block', fontSize: 13.5 }}>
-                          Excluir bibliografía
-                        </strong>
-                        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                          Ignora la lista de referencias bibliográficas al calcular el porcentaje de
-                          similitud.
-                        </span>
-                      </div>
-                    </label>
-
-                    <label className="filter-switch-item">
-                      <input
-                        type="checkbox"
-                        checked={excludeQuotes}
-                        onChange={(e) => setExcludeQuotes(e.target.checked)}
-                      />
-                      <div>
-                        <strong style={{ display: 'block', fontSize: 13.5 }}>
-                          Excluir citas textuales
-                        </strong>
-                        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                          Excluye el texto citado correctamente entre comillas del puntaje total.
-                        </span>
-                      </div>
-                    </label>
-
-                    <label className="filter-switch-item">
-                      <input
-                        type="checkbox"
-                        checked={excludeSmallWords}
-                        onChange={(e) => setExcludeSmallWords(e.target.checked)}
-                      />
-                      <div>
-                        <strong style={{ display: 'block', fontSize: 13.5 }}>
-                          Excluir coincidencias menores (&lt; 10 palabras)
-                        </strong>
-                        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                          Evita que frases comunes o nombres propios sumen porcentaje de similitud.
-                        </span>
-                      </div>
-                    </label>
-                  </div>
-                </section>
+                </div>
+                <span className="status-pill status-emerald">
+                  <span className="pulse-dot" style={{ width: 7, height: 7 }} /> Servicio disponible
+                </span>
               </div>
 
-              {/* Jobs / Documents Table */}
+              {/* Upload Card (Subir documento - Exact fields from turnitinpe.com) */}
+              <section className="panel">
+                <div className="panel-header">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span className="metric-icon metric-blue">
+                      <Upload size={18} />
+                    </span>
+                    <div>
+                      <h2>Subir documento</h2>
+                      <p>Prepara una nueva solicitud de análisis.</p>
+                    </div>
+                  </div>
+                  <span className="code-chip">
+                    1 crédito por documento, incluye IA + Similitud
+                  </span>
+                </div>
+
+                <form
+                  onSubmit={handleFileUploadSubmit}
+                  style={{ display: 'flex', flexDirection: 'column', gap: 16 }}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) setUploadFileName(file.name);
+                    }}
+                  />
+
+                  <div
+                    className="dropzone bs-dropzone"
+                    onClick={() => fileInputRef.current?.click()}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <div className="dropzone-icon">
+                      <Upload size={26} />
+                    </div>
+                    <strong style={{ fontSize: 15.5, display: 'block', marginTop: 4 }}>
+                      {uploadFileName ? uploadFileName : 'Arrastra tu archivo aquí'}
+                    </strong>
+                    <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                      o selecciona un archivo desde tu equipo
+                    </span>
+                    <div style={{ marginTop: 8 }}>
+                      <span className="button button-secondary button-sm">
+                        Seleccionar archivos
+                      </span>
+                    </div>
+                    <small
+                      style={{
+                        display: 'block',
+                        marginTop: 6,
+                        fontSize: 12,
+                        color: 'var(--text-muted)',
+                      }}
+                    >
+                      PDF · Máximo 100 MB por archivo
+                    </small>
+                  </div>
+
+                  {/* Exact fields: Título (readOnly), Autor (disabled), Tipo de informe (fijo en IA y similitud) */}
+                  <div className="bs-fields-grid">
+                    <label className="field">
+                      Título
+                      <input
+                        type="text"
+                        value={uploadFileName}
+                        onChange={(e) => setUploadFileName(e.target.value)}
+                        placeholder="Se obtiene del nombre del archivo"
+                      />
+                    </label>
+
+                    <label className="field">
+                      Autor
+                      <input
+                        type="text"
+                        placeholder="No disponible en este flujo"
+                        disabled
+                        style={{ opacity: 0.65, cursor: 'not-allowed' }}
+                      />
+                    </label>
+
+                    <label className="field">
+                      Tipo de informe
+                      <input
+                        type="text"
+                        value="IA y similitud"
+                        readOnly
+                        disabled
+                        style={{
+                          fontWeight: 700,
+                          color: 'var(--brand-primary)',
+                          background: 'var(--brand-primary-soft)',
+                          borderColor: 'rgba(29, 78, 216, 0.3)',
+                          cursor: 'not-allowed',
+                        }}
+                      />
+                    </label>
+                  </div>
+
+                  <p style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>
+                    El nombre del archivo identifica el documento. Este servicio aún no guarda autor
+                    ni título por separado. Solo PDF: hasta 100 MB por archivo y 200 MB por carga.
+                  </p>
+
+                  {isUploading && (
+                    <div className="pipeline-stepper">
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          fontSize: 12.5,
+                          fontWeight: 700,
+                        }}
+                      >
+                        <span>
+                          {uploadStage === 1
+                            ? 'Validando documento…'
+                            : 'Subiendo documento 1 de 1…'}
+                        </span>
+                        <span>{uploadProgress}%</span>
+                      </div>
+                      <div className="pipeline-progress-track">
+                        <div
+                          className="pipeline-progress-fill"
+                          style={{ width: `${uploadProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                    <button
+                      type="submit"
+                      className="button button-primary"
+                      disabled={isUploading}
+                    >
+                      <FileCheck2 size={16} />
+                      {isUploading ? 'Subiendo documento…' : 'Enviar documento'}
+                    </button>
+                  </div>
+                </form>
+              </section>
+
+              {/* SEGUIMIENTO · Mis documentos (Exact table from turnitinpe.com) */}
               <section className="panel">
                 <div className="panel-header">
                   <div>
-                    <h2>Mis documentos y trabajos ({filteredJobs.length})</h2>
-                    <p>
-                      Estado independiente por cada entregable PDF (Similitud <code>sim-*.pdf</code>{' '}
-                      e IA <code>ai-*.pdf</code>).
-                    </p>
+                    <span className="page-eyebrow" style={{ marginBottom: 2 }}>
+                      SEGUIMIENTO
+                    </span>
+                    <h2>Mis documentos</h2>
+                    <p>Consulta el estado y descarga tus informes.</p>
                   </div>
 
                   <div className="toolbar">
-                    <div className="filter-tabs">
-                      {[
-                        { id: 'all', label: 'Todos' },
-                        { id: 'low', label: 'Similitud ≤ 15%' },
-                        { id: 'high', label: 'Por revisar (>15%)' },
-                      ].map((f) => (
-                        <button
-                          key={f.id}
-                          type="button"
-                          className={`filter-tab ${jobKindFilter === f.id ? 'active' : ''}`}
-                          onClick={() => setJobKindFilter(f.id)}
-                        >
-                          {f.label}
-                        </button>
-                      ))}
-                    </div>
+                    <button
+                      type="button"
+                      className="button button-secondary button-sm"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Upload size={14} /> Subir
+                    </button>
+                    <button
+                      type="button"
+                      className="button button-secondary button-sm"
+                      onClick={() => showNotification('Lista de documentos actualizada.')}
+                    >
+                      <RefreshCw size={14} /> Actualizar
+                    </button>
 
                     <div className="search-box">
                       <Search size={15} style={{ color: 'var(--text-muted)' }} />
@@ -1560,22 +1522,39 @@ export default function App() {
                         type="text"
                         value={jobSearch}
                         onChange={(e) => setJobSearch(e.target.value)}
-                        placeholder="Buscar por código (#13912), documento o cliente…"
+                        placeholder="Buscar por código (13912) o documento…"
                       />
                     </div>
                   </div>
                 </div>
 
+                {/* Exact filter tabs: Todos | Similitud | IA */}
+                <div className="filter-tabs" style={{ marginBottom: 14, width: 'fit-content' }}>
+                  {[
+                    { id: 'all', label: 'Todos' },
+                    { id: 'similarity', label: 'Similitud' },
+                    { id: 'ai', label: 'IA' },
+                  ].map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      className={`filter-tab ${jobKindFilter === f.id ? 'active' : ''}`}
+                      onClick={() => setJobKindFilter(f.id)}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+
                 <div className="table-wrap">
-                  <table className="data-table">
+                  <table className="data-table bs-table-hover">
                     <thead>
                       <tr>
-                        <th>Código</th>
                         <th>Documento</th>
                         <th>Cliente</th>
-                        <th>PDF Similitud</th>
-                        <th>PDF Escritura IA</th>
+                        <th>Informe</th>
                         <th>Actividad</th>
+                        <th>Estado</th>
                         <th>Acciones</th>
                       </tr>
                     </thead>
@@ -1585,124 +1564,138 @@ export default function App() {
                         return (
                           <tr key={job.id}>
                             <td>
-                              <span className="code-chip">#{job.displayCode}</span>
-                            </td>
-                            <td>
-                              <div className="person-meta">
-                                <strong>{job.name}</strong>
-                                <span>
-                                  {((job.sizeBytes || 1200000) / 1024 / 1024).toFixed(2)} MB ·{' '}
-                                  {job.pages || 48} págs. ·{' '}
-                                  {job.provider === 'academiacx' ? 'AcademiaCX' : 'OriginalityPlus'}
-                                </span>
+                              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                                <FileText
+                                  size={18}
+                                  style={{
+                                    color: 'var(--brand-primary)',
+                                    marginTop: 2,
+                                    flexShrink: 0,
+                                  }}
+                                />
+                                <div className="person-meta">
+                                  <small
+                                    style={{
+                                      fontFamily: 'var(--font-mono)',
+                                      fontSize: 11,
+                                      fontWeight: 700,
+                                      color: 'var(--brand-primary)',
+                                    }}
+                                  >
+                                    Código {job.displayCode}
+                                  </small>
+                                  <strong>{job.name}</strong>
+                                </div>
                               </div>
                             </td>
                             <td>
                               <div className="person-meta">
                                 <strong>{job.ownerName}</strong>
-                                <span>{job.ownerEmail}</span>
                               </div>
                             </td>
                             <td>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                                <span
-                                  className={`status-pill ${
-                                    job.similarityScore <= 15
-                                      ? 'status-emerald'
-                                      : job.similarityScore <= 22
-                                      ? 'status-amber'
-                                      : 'status-crimson'
-                                  }`}
-                                >
-                                  {job.similarityScore}% Similitud
-                                </span>
-                                <small style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                                  {job.reportNames?.similarity || `sim-${job.displayCode}.pdf`} ·
-                                  Listo
-                                </small>
-                              </div>
+                              <span className="code-chip">IA + Similitud</span>
                             </td>
-                            <td>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                                {aiFailed ? (
-                                  <>
-                                    <span className="status-pill status-crimson">
-                                      Falló IA (Intento {job.reportStates?.ai?.attempt || 1})
-                                    </span>
-                                    <small style={{ fontSize: 11, color: 'var(--crimson)' }}>
-                                      Similitud lista · Reintentar solo IA
-                                    </small>
-                                  </>
-                                ) : (
-                                  <>
-                                    <span
-                                      className={`status-pill ${
-                                        job.aiScore <= 10 ? 'status-blue' : 'status-amber'
-                                      }`}
-                                    >
-                                      {job.aiScore === 0 ? '0% IA' : `${job.aiScore}% IA`}
-                                    </span>
-                                    <small style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                                      {job.reportNames?.ai || `ai-${job.displayCode}.pdf`} · Listo
-                                    </small>
-                                  </>
+                            <td style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>
+                              <div>
+                                Enviado:{' '}
+                                {new Date(job.createdAt).toLocaleString('es-PE', {
+                                  day: '2-digit',
+                                  month: 'short',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </div>
+                              <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+                                Finalizado:{' '}
+                                {new Date(job.completedAt || job.createdAt).toLocaleString(
+                                  'es-PE',
+                                  {
+                                    day: '2-digit',
+                                    month: 'short',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  }
                                 )}
                               </div>
                             </td>
-                            <td style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>
-                              {new Date(job.createdAt).toLocaleString('es-PE', {
-                                day: '2-digit',
-                                month: 'short',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
+                            <td>
+                              {/* Stacked outcomes matching Zt component in turnitinpe.com */}
+                              <div className="bs-outcomes-stack">
+                                <div className="bs-outcome-item bs-outcome-ok">
+                                  <span className="status-pill status-emerald">
+                                    <CheckCircle2 size={12} /> Similitud listo ({job.similarityScore}
+                                    %)
+                                  </span>
+                                  <button
+                                    type="button"
+                                    className="button button-secondary button-sm"
+                                    onClick={() => handleDownloadCertificate(job, 'similarity')}
+                                  >
+                                    <Download size={13} /> Descargar Similitud
+                                  </button>
+                                </div>
+
+                                {aiFailed ? (
+                                  <div className="bs-outcome-item bs-outcome-err">
+                                    <div>
+                                      <span className="status-pill status-crimson">
+                                        Error en IA
+                                      </span>
+                                      <small
+                                        style={{
+                                          display: 'block',
+                                          fontSize: 11,
+                                          color: 'var(--text-secondary)',
+                                          marginTop: 2,
+                                        }}
+                                      >
+                                        No se pudo generar este informe. Los demás informes
+                                        conservan su estado.
+                                      </small>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      className="button button-emerald button-sm"
+                                      onClick={() => handleRetryAiReport(job.id)}
+                                    >
+                                      <RefreshCw size={13} /> Reintentar IA
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="bs-outcome-item bs-outcome-ok">
+                                    <span className="status-pill status-blue">
+                                      <CheckCircle2 size={12} /> IA listo ({job.aiScore}%)
+                                    </span>
+                                    <button
+                                      type="button"
+                                      className="button button-secondary button-sm"
+                                      onClick={() => handleDownloadCertificate(job, 'ai')}
+                                    >
+                                      <Download size={13} /> Descargar IA
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
                             </td>
                             <td>
-                              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                              <div style={{ display: 'flex', gap: 6 }}>
                                 <button
                                   type="button"
                                   className="button button-primary button-sm"
                                   onClick={() => setSelectedJobForReport(job)}
                                 >
-                                  <Eye size={13} /> Visor
+                                  <Eye size={13} /> Detalle
                                 </button>
                                 <button
                                   type="button"
                                   className="button button-secondary button-sm"
-                                  onClick={() => handleDownloadCertificate(job, 'similarity')}
-                                  title="Descargar PDF de Similitud"
-                                >
-                                  <Download size={13} /> Similitud
-                                </button>
-                                {aiFailed ? (
-                                  <button
-                                    type="button"
-                                    className="button button-emerald button-sm"
-                                    onClick={() => handleRetryAiReport(job.id)}
-                                    title="Reintentar únicamente el reporte PDF de IA"
-                                  >
-                                    <RefreshCw size={13} /> Reintentar IA
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    className="button button-secondary button-sm"
-                                    onClick={() => handleDownloadCertificate(job, 'ai')}
-                                    title="Descargar PDF de IA"
-                                  >
-                                    <Download size={13} /> IA
-                                  </button>
-                                )}
-                                <button
-                                  type="button"
-                                  className="icon-btn danger"
                                   onClick={() => {
                                     setJobs((prev) => prev.filter((item) => item.id !== job.id));
-                                    showNotification(`Trabajo #${job.displayCode} eliminado.`);
+                                    showNotification(`Documento #${job.displayCode} eliminado.`);
                                   }}
-                                  title="Eliminar documento e informes"
                                 >
-                                  <Trash2 size={14} />
+                                  <Trash2 size={13} /> Eliminar
                                 </button>
                               </div>
                             </td>
@@ -1712,6 +1705,18 @@ export default function App() {
                     </tbody>
                   </table>
                 </div>
+
+                <p
+                  style={{
+                    marginTop: 14,
+                    fontSize: 12,
+                    color: 'var(--text-muted)',
+                    borderTop: '1px solid var(--border-color)',
+                    paddingTop: 12,
+                  }}
+                >
+                  Los informes se conservan hasta tu eliminación explícita; plazo mínimo: 7 días.
+                </p>
               </section>
             </>
           )}

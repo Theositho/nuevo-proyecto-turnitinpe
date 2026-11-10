@@ -2111,3 +2111,81 @@ a {
     grid-template-columns: 1fr;
   }
 }
+
+/* ==========================================
+   BOOTSTRAP 5 / ENTERPRISE DESIGN SYSTEM ENHANCEMENTS
+   ========================================== */
+.bs-summary-alert {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--brand-primary);
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  box-shadow: var(--shadow-xs);
+}
+
+.bs-dropzone {
+  padding: 28px 20px;
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, var(--bg-surface-subtle) 0%, var(--bg-surface) 100%);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.18s ease;
+}
+
+.bs-dropzone:hover {
+  border-color: var(--brand-primary);
+  background: var(--brand-primary-soft);
+  transform: translateY(-1px);
+}
+
+.bs-fields-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.bs-table-hover tbody tr {
+  transition: background-color 0.14s ease;
+}
+
+.bs-table-hover tbody tr:hover {
+  background-color: var(--bg-surface-subtle);
+}
+
+.bs-outcomes-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 280px;
+}
+
+.bs-outcome-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bg-surface-subtle);
+  border: 1px solid var(--border-color);
+}
+
+.bs-outcome-err {
+  background: var(--crimson-soft);
+  border-color: var(--crimson-border);
+}
+
+@media (max-width: 920px) {
+  .bs-fields-grid {
+    grid-template-columns: 1fr;
+  }
+}
