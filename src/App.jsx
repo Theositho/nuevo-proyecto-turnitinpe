@@ -66,6 +66,15 @@ function getInitials(name = '') {
   );
 }
 
+function toDateTimeLocalValue(dateInput) {
+  const d = dateInput ? new Date(dateInput) : new Date(Date.now() + 30 * 86400000);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
+    d.getHours()
+  )}:${pad(d.getMinutes())}`;
+}
+
 function TurnitinSymbol() {
   return (
     <svg
@@ -83,6 +92,48 @@ function TurnitinSymbol() {
         d="M7.23033 0.188843C4.67321 0.188843 2.58636 2.28018 2.55697 4.81334L2.38062 17.8326L5.05531 17.8621H7.7006L7.84757 5.52027H29.7154L29.8623 38.9521H22.867L21.9558 44.2836H30.509C33.0661 44.2836 35.1823 41.9566 35.2117 39.394L35.1235 0.188843H7.23033Z"
         fill="#0096FF"
       />
+    </svg>
+  );
+}
+
+function QuillbotIcon({ size = 18 }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 64 64"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      style={{ flexShrink: 0, borderRadius: '50%' }}
+      aria-hidden="true"
+    >
+      <circle cx="32" cy="32" r="30" fill="#499557" />
+      {/* Feather / Quill on top of robot head */}
+      <path
+        d="M31.5 22C31.5 16.5 35.5 11.2 40.5 9.5C40.3 12.2 39.2 14.2 37.5 15.3L39.3 15.6C38.2 17.6 36.8 18.8 35.2 19.6L36.8 20C35.4 21.4 33.6 22 31.5 22Z"
+        fill="#FFFFFF"
+      />
+      <path
+        d="M32 22L38.5 11.5"
+        stroke="#499557"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+      {/* Robot Head */}
+      <rect x="17" y="22" width="30" height="19" rx="2" fill="#FFFFFF" />
+      {/* Robot Eyes */}
+      <circle cx="24.5" cy="31.5" r="3.4" fill="#499557" />
+      <circle cx="39.5" cy="31.5" r="3.4" fill="#499557" />
+      {/* Neck */}
+      <rect x="27.5" y="42" width="9" height="3" fill="#FFFFFF" />
+      {/* Torso */}
+      <path
+        d="M19 46H45V56C40.8 58.6 36.5 60 32 60C27.5 60 23.2 58.6 19 56V46Z"
+        fill="#FFFFFF"
+      />
+      <path d="M19 50H33V59.5" stroke="#499557" strokeWidth="1.5" />
+      <line x1="21" y1="53" x2="30" y2="53" stroke="#499557" strokeWidth="1.5" />
+      <circle cx="39" cy="53" r="2.6" stroke="#499557" strokeWidth="1.5" />
     </svg>
   );
 }
@@ -157,8 +208,10 @@ export default function App() {
   const [newUserForm, setNewUserForm] = useState({
     name: '',
     email: '',
+    serviceType: 'feedback', // 'feedback' (7/día) | 'originality' (ilimitado) | 'both'
     planId: SEED_PLANS[0].id,
     deviceLimit: 2,
+    expiresAt: toDateTimeLocalValue(new Date(Date.now() + 30 * 86400000)),
     sellerWhatsapp: '+51987654321',
   });
 
@@ -232,7 +285,7 @@ export default function App() {
         return updated;
       })
     );
-    showNotification('Reporte PDF de IA regenerado con éxito en Estación Chrome (0% IA).');
+    showNotification('Reporte PDF de IA regenerado con éxito (0% IA).');
   };
 
   const handleFileUploadSubmit = (e) => {
@@ -359,27 +412,55 @@ export default function App() {
     e.preventDefault();
     if (!newUserForm.name.trim() || !newUserForm.email.trim()) return;
     const chosenPlan = plans.find((p) => p.id === newUserForm.planId) || plans[0];
-    const limitVal = chosenPlan.feedbackPolicy?.dailyLimit || 7;
+    const svcType = chosenPlan.serviceType || newUserForm.serviceType || 'feedback';
+    const acctType =
+      chosenPlan.accountType ||
+      (chosenPlan.modality === 'student' ? 'student' : 'instructor');
+    const isUnlimited =
+      svcType === 'originality' || chosenPlan.feedbackPolicy?.mode === 'unlimited';
+    const reportKinds =
+      acctType === 'student' ? ['similarity'] : ['ai', 'similarity'];
+    const parsedExpiry = newUserForm.expiresAt
+      ? new Date(newUserForm.expiresAt)
+      : new Date(Date.now() + 30 * 86400000);
+    const expiresIso = Number.isNaN(parsedExpiry.getTime())
+      ? new Date(Date.now() + 30 * 86400000).toISOString()
+      : parsedExpiry.toISOString();
+
     const created = {
       id: `usr-${Date.now()}`,
       name: newUserForm.name.trim(),
       email: newUserForm.email.trim(),
       role: 'member',
       status: 'active',
+      accountType: acctType,
+      reportKinds,
+      serviceType: svcType,
       planId: chosenPlan.id,
       planName: chosenPlan.name,
       deviceLimit: Number(newUserForm.deviceLimit) || 2,
       deviceCount: 0,
-      originalityApproved: true,
-      expiresAt: new Date(Date.now() + 30 * 86400000).toISOString(),
+      originalityApproved: isUnlimited,
+      unlimitedOriginality: isUnlimited,
+      expiresAt: expiresIso,
       lastLogin: null,
-      daily: {
-        configuredLimit: limitVal,
-        limit: limitVal,
-        reserved: 0,
-        consumed: 0,
-        remaining: limitVal,
-      },
+      daily: isUnlimited
+        ? {
+            configuredLimit: null,
+            limit: null,
+            unlimited: true,
+            reserved: 0,
+            consumed: 0,
+            remaining: null,
+          }
+        : {
+            configuredLimit: 7,
+            limit: 7,
+            unlimited: false,
+            reserved: 0,
+            consumed: 0,
+            remaining: 7,
+          },
       sellerWhatsapp: newUserForm.sellerWhatsapp,
     };
     setUsers((prev) => [created, ...prev]);
@@ -387,11 +468,19 @@ export default function App() {
     setNewUserForm({
       name: '',
       email: '',
+      serviceType: 'feedback',
       planId: SEED_PLANS[0].id,
       deviceLimit: 2,
+      expiresAt: toDateTimeLocalValue(new Date(Date.now() + 30 * 86400000)),
       sellerWhatsapp: '+51987654321',
     });
-    showNotification(`Cuenta creada para ${created.name} (${created.planName}).`);
+    showNotification(
+      `Cuenta ${chosenPlan.name} (${
+        acctType === 'student' ? 'Solo Similitud' : 'Similitud + IA'
+      } · ${isUnlimited ? 'Reportes ilimitados' : '7 reportes al día'}) creada para ${
+        created.name
+      }.`
+    );
   };
 
   const handleCreatePlan = (e) => {
@@ -546,7 +635,7 @@ export default function App() {
 
           <div className="auth-story-footer">
             <span>turnitinpe · Cada persona, el acceso correcto.</span>
-            <span>Estación Chrome OriginalityPlus Activa</span>
+            <span>Procesamiento Sin Depósito (No Repository)</span>
           </div>
         </section>
 
@@ -642,6 +731,11 @@ export default function App() {
   }
 
   const isAdminView = viewMode === 'admin';
+  const isStudentAccount =
+    viewMode === 'student' ||
+    (!isAdminView &&
+      (user?.accountType === 'student' ||
+        (user?.planName || '').toUpperCase().includes('ESTUDIANTE')));
 
   // Exact navigation matching turnitinpe.com
   const navGroups = [
@@ -653,7 +747,7 @@ export default function App() {
           id: 'turnitin2',
           label: 'Turnitin Feedback',
           icon: FileCheck2,
-          proBadge: 'IA + Sim',
+          proBadge: isStudentAccount ? 'Similitud' : 'IA + Sim',
         },
         {
           id: 'documents',
@@ -665,8 +759,10 @@ export default function App() {
     {
       label: 'SERVICIOS COMPLEMENTARIOS',
       items: [
-        { id: 'quillbot', label: 'QuillBot', icon: Feather },
-        { id: 'nvidia', label: 'Todas las IA', icon: Sparkles },
+        { id: 'quillbot', label: 'QuillBot', icon: QuillbotIcon },
+        ...(!isStudentAccount
+          ? [{ id: 'nvidia', label: 'Todas las IA', icon: Sparkles }]
+          : []),
       ],
     },
     ...(isAdminView
@@ -696,15 +792,19 @@ export default function App() {
     },
     turnitin2: {
       eyebrow: 'TU ESPACIO DE ANÁLISIS',
-      title: 'Turnitin Feedback · Detección de IA y Similitud',
-      subtitle:
-        'Prepara una nueva solicitud de análisis en PDF y descarga tus informes oficiales de IA y Similitud sin depósito.',
+      title: isStudentAccount
+        ? 'Turnitin Feedback · Reporte de Similitud'
+        : 'Turnitin Feedback · Detección de IA y Similitud',
+      subtitle: isStudentAccount
+        ? 'Prepara una nueva solicitud de análisis en PDF (7 reportes al día) y descarga tu informe oficial de Similitud sin depósito.'
+        : 'Prepara una nueva solicitud de análisis en PDF (7 reportes al día) y descarga tus informes oficiales de IA y Similitud sin depósito.',
     },
     documents: {
       eyebrow: 'DOCUMENTOS PRIVADOS',
       title: 'Turnitin Originality · Tus archivos en un lugar',
-      subtitle:
-        'Guarda documentos (.docx / .pdf), aplica filtros de exclusión y consulta sus informes independientes.',
+      subtitle: isStudentAccount
+        ? 'Analiza documentos PDF con reportes ilimitados de Similitud sin indexación en repositorio.'
+        : 'Analiza documentos PDF con reportes ilimitados de IA y Similitud sin indexación en repositorio.',
     },
     quillbot: {
       eyebrow: 'APOYO A LA REDACCIÓN',
@@ -722,13 +822,13 @@ export default function App() {
       eyebrow: 'EQUIPO Y PERMISOS',
       title: 'Personas con acceso.',
       subtitle:
-        'Crea cuentas, asigna planes, controla el límite de dispositivos, acredita reportes y envía accesos por WhatsApp.',
+        'Crea cuentas de Instructor/Asesor (Similitud + IA) o Estudiante (Solo Similitud) con fecha y hora de vencimiento.',
     },
     plans: {
       eyebrow: 'CATÁLOGO COMERCIAL',
       title: 'Planes y precios.',
       subtitle:
-        'Define precios en Soles (PEN), cuotas diarias de PDF (IA + Similitud) y permisos incluidos.',
+        'Instructor Básico S/ 80 (7/día · Similitud+IA) · Instructor Ilimitado S/ 200 (Ilimitado · Similitud+IA) · Estudiante Básico S/ 50 (7/día · Similitud) · Estudiante Ilimitado S/ 100 (Ilimitado · Similitud).',
     },
     'turnitin-settings': {
       eyebrow: 'PROCESAMIENTO Y ESTACIONES',
@@ -740,7 +840,7 @@ export default function App() {
       eyebrow: 'HORA EN LIMA (AMERICA/LIMA)',
       title: 'Historial de cuotas de reportes.',
       subtitle:
-        'Consulta los reportes consumidos hoy por cada cliente y acredita unidades adicionales.',
+        'Consulta los reportes consumidos hoy por cada cliente (7/día en Básico e Ilimitados en Originality).',
     },
     'client-uploads': {
       eyebrow: 'ALMACENAMIENTO DE DOCUMENTOS',
@@ -752,7 +852,7 @@ export default function App() {
       eyebrow: 'REGISTRO DEL ESPACIO',
       title: 'Actividad de usuarios.',
       subtitle:
-        'Consulta las sesiones iniciadas, los trabajos procesados por la estación Chrome y los movimientos administrativos.',
+        'Consulta las sesiones iniciadas, los trabajos procesados y los movimientos administrativos.',
     },
   }[activeTab] || {
     eyebrow: 'TURNITINPE',
@@ -783,14 +883,15 @@ export default function App() {
         <div className="sidebar-role-switcher" role="group" aria-label="Cambiar modo de vista">
           <button
             type="button"
-            className={`role-switch-btn ${isAdminView ? 'active' : ''}`}
+            className={`role-switch-btn ${viewMode === 'admin' ? 'active' : ''}`}
             onClick={() => setViewMode('admin')}
+            title="Vista Administrador"
           >
-            <ShieldCheck size={14} /> Vista Admin
+            <ShieldCheck size={13} /> Admin
           </button>
           <button
             type="button"
-            className={`role-switch-btn ${!isAdminView ? 'active' : ''}`}
+            className={`role-switch-btn ${viewMode === 'member' ? 'active' : ''}`}
             onClick={() => {
               setViewMode('member');
               if (
@@ -806,8 +907,32 @@ export default function App() {
                 setActiveTab('turnitin2');
               }
             }}
+            title="Vista Instructor (Asesor): Muestra Similitud + IA"
           >
-            <FileCheck2 size={14} /> Vista Cliente
+            <FileCheck2 size={13} /> Instructor
+          </button>
+          <button
+            type="button"
+            className={`role-switch-btn ${viewMode === 'student' ? 'active' : ''}`}
+            onClick={() => {
+              setViewMode('student');
+              if (
+                [
+                  'users',
+                  'plans',
+                  'daily-limits',
+                  'turnitin-settings',
+                  'client-uploads',
+                  'activity',
+                  'nvidia',
+                ].includes(activeTab)
+              ) {
+                setActiveTab('turnitin2');
+              }
+            }}
+            title="Vista Estudiante: Solo muestra Similitud"
+          >
+            <FileText size={13} /> Estudiante
           </button>
         </div>
 
@@ -840,11 +965,6 @@ export default function App() {
         </nav>
 
         <div className="sidebar-footer">
-          <div className="sidebar-station-pill">
-            <span className="pulse-dot" />
-            <span>Estación Chrome · OriginalityPlus</span>
-          </div>
-
           <div className="sidebar-profile-row">
             <button
               type="button"
@@ -854,7 +974,11 @@ export default function App() {
               <span className="avatar avatar-sm">{getInitials(user.name)}</span>
               <span className="sidebar-profile-info">
                 <strong>{user.name}</strong>
-                <small>{isAdminView ? 'Administrador (report_admin)' : user.planName || 'INSTRUCTOR BASICO'}</small>
+                <small>
+                  {isAdminView
+                    ? 'Administrador (report_admin)'
+                    : user.planName || 'INSTRUCTOR BÁSICO (7 / DÍA)'}
+                </small>
               </span>
             </button>
             <button
@@ -903,7 +1027,11 @@ export default function App() {
             </span>
             <span className="quota-chip">
               <FileCheck2 size={14} style={{ color: 'var(--brand-primary)' }} />
-              {isAdminView ? 'Reportes Ilimitados' : 'Cuota hoy: 5 / 7 disponibles'}
+              {activeTab === 'documents' || user.serviceType === 'originality'
+                ? 'Turnitin Originality: Reportes Ilimitados'
+                : isAdminView
+                ? 'Feedback: 7/día · Originality: Ilimitado'
+                : `Turnitin Feedback: ${user.daily?.remaining ?? 7} / 7 reportes hoy`}
             </span>
             <button
               type="button"
@@ -920,7 +1048,10 @@ export default function App() {
           <div className="page-header">
             <div>
               <span className="page-eyebrow">{pageMeta.eyebrow}</span>
-              <h1>{pageMeta.title}</h1>
+              <h1 style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {activeTab === 'quillbot' && <QuillbotIcon size={28} />}
+                <span>{pageMeta.title}</span>
+              </h1>
               <p>{pageMeta.subtitle}</p>
             </div>
             <div className="page-actions">
@@ -955,8 +1086,7 @@ export default function App() {
                 <div>
                   <div className="hero-badge-row">
                     <span className="hero-live-pill">
-                      <span className="pulse-dot" /> Estación Chrome ·{' '}
-                      {activeProvider === 'academiacx' ? 'AcademiaCX' : 'OriginalityPlus'} Activa
+                      <span className="pulse-dot" /> Servicio Activo · Recepción Inmediata
                     </span>
                     <span className="hero-meta-pill">
                       <ShieldCheck size={13} /> Sin Depósito (No Repository)
@@ -969,9 +1099,9 @@ export default function App() {
                     Plataforma Oficial de Reportes de IA y Similitud Turnitin
                   </h2>
                   <p>
-                    Procesamiento directo mediante subida por bloques (hasta 100 MB) con entrega de
-                    dos certificados PDF independientes: <strong>Similitud (sim-*.pdf)</strong> y{' '}
-                    <strong>Escritura con IA (ai-*.pdf)</strong> sin indexación en base de datos.
+                    Cuentas de <strong>Turnitin Feedback con 7 reportes al día</strong> y cuentas de{' '}
+                    <strong>Turnitin Originality con reportes ilimitados</strong>. Entrega simultánea
+                    de <strong>Similitud (sim-*.pdf)</strong> y <strong>Escritura con IA (ai-*.pdf)</strong>.
                   </p>
                   <div className="hero-cta-row">
                     <button
@@ -979,7 +1109,7 @@ export default function App() {
                       className="button button-primary"
                       onClick={() => setActiveTab('turnitin2')}
                     >
-                      <Upload size={15} /> Analizar PDF en Turnitin Feedback
+                      <Upload size={15} /> Turnitin Feedback (7 reportes/día)
                     </button>
                     <button
                       type="button"
@@ -991,19 +1121,19 @@ export default function App() {
                       }}
                       onClick={() => setActiveTab('documents')}
                     >
-                      <FolderLock size={15} /> Abrir Turnitin Originality
+                      <FolderLock size={15} /> Turnitin Originality (Ilimitado)
                     </button>
                   </div>
                 </div>
 
                 <div className="hero-telemetry-box">
                   <div className="hero-telemetry-row">
-                    <span>Estado de cola (/api/turnitin2)</span>
-                    <strong style={{ color: '#6ee7b7' }}>0 en espera · Recepción inmediata</strong>
+                    <span>Turnitin Feedback</span>
+                    <strong style={{ color: '#6ee7b7' }}>7 reportes PDF al día</strong>
                   </div>
                   <div className="hero-telemetry-row">
-                    <span>Vinculaciones Chrome activas</span>
-                    <strong>26 estaciones (OriginalityPlus)</strong>
+                    <span>Turnitin Originality</span>
+                    <strong style={{ color: '#38bdf8' }}>Reportes PDF ilimitados</strong>
                   </div>
                   <div className="hero-telemetry-row">
                     <span>Tamaño máximo por PDF</span>
@@ -1016,60 +1146,69 @@ export default function App() {
                 </div>
               </section>
 
-              <div className="metrics-grid">
-                <article className="metric-card">
-                  <div className="metric-top">
-                    <span>Personas en el espacio</span>
-                    <span className="metric-icon metric-blue">
-                      <Users size={18} />
-                    </span>
-                  </div>
-                  <div className="metric-value">{users.length}</div>
-                  <span className="metric-note">Cuentas registradas en turnitinpe</span>
-                </article>
+              {/* Tarjetas de métricas operativas: ocultas completamente para los clientes */}
+              {isAdminView && (
+                <div className="metrics-grid">
+                  <article className="metric-card">
+                    <div className="metric-top">
+                      <span>Personas en el espacio</span>
+                      <span className="metric-icon metric-blue">
+                        <Users size={18} />
+                      </span>
+                    </div>
+                    <div className="metric-value">{users.length}</div>
+                    <span className="metric-note">Cuentas registradas en turnitinpe</span>
+                  </article>
 
-                <article className="metric-card">
-                  <div className="metric-top">
-                    <span>Accesos activos</span>
-                    <span className="metric-icon metric-emerald">
-                      <CheckCircle2 size={18} />
-                    </span>
-                  </div>
-                  <div className="metric-value">
-                    {users.filter((u) => u.status === 'active').length}
-                  </div>
-                  <span className="metric-note">Listos para enviar documentos hoy</span>
-                </article>
+                  <article className="metric-card">
+                    <div className="metric-top">
+                      <span>Accesos activos</span>
+                      <span className="metric-icon metric-emerald">
+                        <CheckCircle2 size={18} />
+                      </span>
+                    </div>
+                    <div className="metric-value">
+                      {users.filter((u) => u.status === 'active').length}
+                    </div>
+                    <span className="metric-note">Listos para enviar documentos hoy</span>
+                  </article>
 
-                <article className="metric-card">
-                  <div className="metric-top">
-                    <span>Trabajos procesados</span>
-                    <span className="metric-icon metric-amber">
-                      <FileCheck2 size={18} />
-                    </span>
-                  </div>
-                  <div className="metric-value">{100 + jobs.length - SEED_JOBS.length}</div>
-                  <span className="metric-note">Reportes PDF de IA + Similitud</span>
-                </article>
+                  <article className="metric-card">
+                    <div className="metric-top">
+                      <span>Trabajos procesados</span>
+                      <span className="metric-icon metric-amber">
+                        <FileCheck2 size={18} />
+                      </span>
+                    </div>
+                    <div className="metric-value">{100 + jobs.length - SEED_JOBS.length}</div>
+                    <span className="metric-note">Reportes PDF de IA + Similitud</span>
+                  </article>
 
-                <article className="metric-card">
-                  <div className="metric-top">
-                    <span>Estaciones Chrome</span>
-                    <span className="metric-icon metric-blue">
-                      <ShieldCheck size={18} />
-                    </span>
-                  </div>
-                  <div className="metric-value">26</div>
-                  <span className="metric-note">OriginalityPlus conectada en vivo</span>
-                </article>
-              </div>
+                  <article className="metric-card">
+                    <div className="metric-top">
+                      <span>Planes activos</span>
+                      <span className="metric-icon metric-blue">
+                        <ShieldCheck size={18} />
+                      </span>
+                    </div>
+                    <div className="metric-value">7/día · ∞</div>
+                    <span className="metric-note">Instructor Básico (7/día) · Originality (∞)</span>
+                  </article>
+                </div>
+              )}
 
               <div className="overview-grid">
                 {/* Latest Reports */}
                 <section className="panel">
                   <div className="panel-header">
                     <div>
-                      <h2>Últimos Reportes de IA y Similitud</h2>
+                      <h2>
+                        {isAdminView
+                          ? 'Últimos Reportes de IA y Similitud'
+                          : isStudentAccount
+                          ? 'Mis Últimos Reportes de Similitud'
+                          : 'Mis Últimos Reportes de IA y Similitud'}
+                      </h2>
                       <p>Haz clic en cualquier trabajo para abrir el visor o descargar sus PDF.</p>
                     </div>
                     <button
@@ -1088,7 +1227,7 @@ export default function App() {
                           <th>Código</th>
                           <th>Documento</th>
                           <th>Similitud (sim-*.pdf)</th>
-                          <th>Detección IA (ai-*.pdf)</th>
+                          {!isStudentAccount && <th>Detección IA (ai-*.pdf)</th>}
                           <th>Informes</th>
                         </tr>
                       </thead>
@@ -1103,7 +1242,7 @@ export default function App() {
                               <td>
                                 <div className="person-meta">
                                   <strong>{job.name}</strong>
-                                  <span>Cliente: {job.ownerName}</span>
+                                  {isAdminView && <span>Cliente: {job.ownerName}</span>}
                                 </div>
                               </td>
                               <td>
@@ -1119,26 +1258,28 @@ export default function App() {
                                   {job.similarityScore}% Similitud
                                 </span>
                               </td>
-                              <td>
-                                {aiFailed ? (
-                                  <button
-                                    type="button"
-                                    className="status-pill status-crimson"
-                                    onClick={() => handleRetryAiReport(job.id)}
-                                    title="Reintentar generación de PDF de IA"
-                                  >
-                                    <RefreshCw size={11} /> Error IA · Reintentar
-                                  </button>
-                                ) : (
-                                  <span
-                                    className={`status-pill ${
-                                      job.aiScore <= 10 ? 'status-blue' : 'status-amber'
-                                    }`}
-                                  >
-                                    {job.aiScore}% IA
-                                  </span>
-                                )}
-                              </td>
+                              {!isStudentAccount && (
+                                <td>
+                                  {aiFailed ? (
+                                    <button
+                                      type="button"
+                                      className="status-pill status-crimson"
+                                      onClick={() => handleRetryAiReport(job.id)}
+                                      title="Reintentar generación de PDF de IA"
+                                    >
+                                      <RefreshCw size={11} /> Error IA · Reintentar
+                                    </button>
+                                  ) : (
+                                    <span
+                                      className={`status-pill ${
+                                        job.aiScore <= 10 ? 'status-blue' : 'status-amber'
+                                      }`}
+                                    >
+                                      {job.aiScore}% IA
+                                    </span>
+                                  )}
+                                </td>
+                              )}
                               <td>
                                 <button
                                   type="button"
@@ -1158,106 +1299,112 @@ export default function App() {
 
                 {/* Distribution & Services Status */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-                  <section className="panel">
-                    <div className="panel-header" style={{ marginBottom: 8 }}>
-                      <div>
-                        <h2>Distribución de Reportes Recientes</h2>
-                        <p>Métricas en tiempo real de Similitud y Escritura con IA</p>
-                      </div>
-                    </div>
-                    <div className="dist-bar-group">
-                      <div className="dist-bar-item">
-                        <div className="dist-bar-label">
-                          <span>Baja Similitud (≤ 15% · Apto sustentación)</span>
-                          <strong>
-                            {Math.round(
-                              (jobs.filter((j) => j.similarityScore <= 15).length / jobs.length) *
-                                100
-                            )}
-                            %
-                          </strong>
+                  {isAdminView && (
+                    <section className="panel">
+                      <div className="panel-header" style={{ marginBottom: 8 }}>
+                        <div>
+                          <h2>Distribución de Reportes Recientes</h2>
+                          <p>Métricas en tiempo real de Similitud y Escritura con IA</p>
                         </div>
-                        <div className="dist-bar-track">
-                          <div
-                            className="dist-bar-fill"
-                            style={{
-                              width: `${Math.round(
+                      </div>
+                      <div className="dist-bar-group">
+                        <div className="dist-bar-item">
+                          <div className="dist-bar-label">
+                            <span>Baja Similitud (≤ 15% · Apto sustentación)</span>
+                            <strong>
+                              {Math.round(
                                 (jobs.filter((j) => j.similarityScore <= 15).length / jobs.length) *
                                   100
-                              )}%`,
-                              background: 'var(--emerald)',
-                            }}
-                          />
+                              )}
+                              %
+                            </strong>
+                          </div>
+                          <div className="dist-bar-track">
+                            <div
+                              className="dist-bar-fill"
+                              style={{
+                                width: `${Math.round(
+                                  (jobs.filter((j) => j.similarityScore <= 15).length /
+                                    jobs.length) *
+                                    100
+                                )}%`,
+                                background: 'var(--emerald)',
+                              }}
+                            />
+                          </div>
                         </div>
-                      </div>
 
-                      <div className="dist-bar-item">
-                        <div className="dist-bar-label">
-                          <span>Similitud Moderada / Por revisar (&gt; 15%)</span>
-                          <strong>
-                            {Math.round(
-                              (jobs.filter((j) => j.similarityScore > 15).length / jobs.length) *
-                                100
-                            )}
-                            %
-                          </strong>
-                        </div>
-                        <div className="dist-bar-track">
-                          <div
-                            className="dist-bar-fill"
-                            style={{
-                              width: `${Math.round(
+                        <div className="dist-bar-item">
+                          <div className="dist-bar-label">
+                            <span>Similitud Moderada / Por revisar (&gt; 15%)</span>
+                            <strong>
+                              {Math.round(
                                 (jobs.filter((j) => j.similarityScore > 15).length / jobs.length) *
                                   100
-                              )}%`,
-                              background: 'var(--amber)',
-                            }}
-                          />
+                              )}
+                              %
+                            </strong>
+                          </div>
+                          <div className="dist-bar-track">
+                            <div
+                              className="dist-bar-fill"
+                              style={{
+                                width: `${Math.round(
+                                  (jobs.filter((j) => j.similarityScore > 15).length /
+                                    jobs.length) *
+                                    100
+                                )}%`,
+                                background: 'var(--amber)',
+                              }}
+                            />
+                          </div>
                         </div>
-                      </div>
 
-                      <div className="dist-bar-item">
-                        <div className="dist-bar-label">
-                          <span>Escritura Humana Verificada (0% – 10% IA)</span>
-                          <strong>
-                            {Math.round(
-                              (jobs.filter(
-                                (j) => j.reportStates?.ai?.state !== 'failed' && j.aiScore <= 10
-                              ).length /
-                                jobs.length) *
-                                100
-                            )}
-                            %
-                          </strong>
-                        </div>
-                        <div className="dist-bar-track">
-                          <div
-                            className="dist-bar-fill"
-                            style={{
-                              width: `${Math.round(
+                        <div className="dist-bar-item">
+                          <div className="dist-bar-label">
+                            <span>Escritura Humana Verificada (0% – 10% IA)</span>
+                            <strong>
+                              {Math.round(
                                 (jobs.filter(
                                   (j) => j.reportStates?.ai?.state !== 'failed' && j.aiScore <= 10
                                 ).length /
                                   jobs.length) *
                                   100
-                              )}%`,
-                              background: 'var(--brand-primary)',
-                            }}
-                          />
+                              )}
+                              %
+                            </strong>
+                          </div>
+                          <div className="dist-bar-track">
+                            <div
+                              className="dist-bar-fill"
+                              style={{
+                                width: `${Math.round(
+                                  (jobs.filter(
+                                    (j) => j.reportStates?.ai?.state !== 'failed' && j.aiScore <= 10
+                                  ).length /
+                                    jobs.length) *
+                                    100
+                                )}%`,
+                                background: 'var(--brand-primary)',
+                              }}
+                            />
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </section>
+                    </section>
+                  )}
 
                   <section className="panel">
                     <div className="panel-header">
                       <div>
                         <h2>Servicios del Espacio</h2>
-                        <p>4 herramientas conectadas en tu dashboard</p>
+                        <p>Herramientas conectadas en tu dashboard</p>
                       </div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      {SEED_SERVICES.map((svc) => (
+                      {SEED_SERVICES.filter((svc) =>
+                        isStudentAccount ? svc.id !== 'nvidia' : true
+                      ).map((svc) => (
                         <div
                           key={svc.id}
                           style={{
@@ -1273,6 +1420,7 @@ export default function App() {
                         >
                           <div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              {svc.id === 'quillbot' && <QuillbotIcon size={20} />}
                               <strong>{svc.name}</strong>
                               <span className="status-pill status-emerald">Recepción activa</span>
                             </div>
@@ -1325,14 +1473,20 @@ export default function App() {
                         color: 'var(--text-muted)',
                       }}
                     >
-                      Tu plan
+                      {isStudentAccount
+                        ? 'Tu plan (Cuenta Estudiante · Solo Similitud)'
+                        : 'Tu plan (Cuenta Instructor / Asesor · Similitud + IA)'}
                     </small>
                     <strong style={{ fontSize: 14.5 }}>
                       {activeTab === 'documents'
-                        ? 'Turnitin Originality · Envíos independientes habilitados'
-                        : isAdminView
-                        ? 'Documentos ilimitados · 1 crédito por documento (IA + Similitud)'
-                        : '7 de 7 documentos disponibles hoy · Incluye IA + Similitud'}
+                        ? `Turnitin Originality · Reportes ilimitados habilitados (${
+                            isStudentAccount ? 'Solo Similitud' : 'Similitud + IA'
+                          })`
+                        : `${
+                            user.daily?.remaining ?? 7
+                          } de 7 reportes disponibles hoy · Turnitin Feedback (7 reportes al día · ${
+                            isStudentAccount ? 'Solo Similitud' : 'Similitud + IA'
+                          })`}
                     </strong>
                   </div>
                 </div>
@@ -1354,7 +1508,13 @@ export default function App() {
                     </div>
                   </div>
                   <span className="code-chip">
-                    1 crédito por documento, incluye IA + Similitud
+                    {activeTab === 'documents'
+                      ? `Reportes ilimitados · ${
+                          isStudentAccount ? 'Solo Similitud' : 'Incluye Similitud + IA'
+                        }`
+                      : `7 reportes al día · ${
+                          isStudentAccount ? 'Solo Similitud' : 'Incluye Similitud + IA'
+                        }`}
                   </span>
                 </div>
 
@@ -1405,7 +1565,7 @@ export default function App() {
                     </small>
                   </div>
 
-                  {/* Exact fields: Título (readOnly), Autor (disabled), Tipo de informe (fijo en IA y similitud) */}
+                  {/* Exact fields: Título, Autor, Tipo de informe */}
                   <div className="bs-fields-grid">
                     <label className="field">
                       Título
@@ -1431,7 +1591,7 @@ export default function App() {
                       Tipo de informe
                       <input
                         type="text"
-                        value="IA y similitud"
+                        value={isStudentAccount ? 'Solo Similitud (Estudiante)' : 'Similitud + IA (Instructor)'}
                         readOnly
                         disabled
                         style={{
@@ -1528,12 +1688,12 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Exact filter tabs: Todos | Similitud | IA */}
+                {/* Filter tabs: hide IA tab for student accounts */}
                 <div className="filter-tabs" style={{ marginBottom: 14, width: 'fit-content' }}>
                   {[
                     { id: 'all', label: 'Todos' },
                     { id: 'similarity', label: 'Similitud' },
-                    { id: 'ai', label: 'IA' },
+                    ...(!isStudentAccount ? [{ id: 'ai', label: 'IA' }] : []),
                   ].map((f) => (
                     <button
                       key={f.id}
@@ -1551,7 +1711,7 @@ export default function App() {
                     <thead>
                       <tr>
                         <th>Documento</th>
-                        <th>Cliente</th>
+                        {isAdminView && <th>Cliente</th>}
                         <th>Informe</th>
                         <th>Actividad</th>
                         <th>Estado</th>
@@ -1588,13 +1748,17 @@ export default function App() {
                                 </div>
                               </div>
                             </td>
+                            {isAdminView && (
+                              <td>
+                                <div className="person-meta">
+                                  <strong>{job.ownerName}</strong>
+                                </div>
+                              </td>
+                            )}
                             <td>
-                              <div className="person-meta">
-                                <strong>{job.ownerName}</strong>
-                              </div>
-                            </td>
-                            <td>
-                              <span className="code-chip">IA + Similitud</span>
+                              <span className="code-chip">
+                                {isStudentAccount ? 'Solo Similitud' : 'Similitud + IA'}
+                              </span>
                             </td>
                             <td style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>
                               <div>
@@ -1620,7 +1784,7 @@ export default function App() {
                               </div>
                             </td>
                             <td>
-                              {/* Stacked outcomes matching Zt component in turnitinpe.com */}
+                              {/* Stacked outcomes: Student accounts only see Similarity */}
                               <div className="bs-outcomes-stack">
                                 <div className="bs-outcome-item bs-outcome-ok">
                                   <span className="status-pill status-emerald">
@@ -1636,46 +1800,47 @@ export default function App() {
                                   </button>
                                 </div>
 
-                                {aiFailed ? (
-                                  <div className="bs-outcome-item bs-outcome-err">
-                                    <div>
-                                      <span className="status-pill status-crimson">
-                                        Error en IA
-                                      </span>
-                                      <small
-                                        style={{
-                                          display: 'block',
-                                          fontSize: 11,
-                                          color: 'var(--text-secondary)',
-                                          marginTop: 2,
-                                        }}
+                                {!isStudentAccount &&
+                                  (aiFailed ? (
+                                    <div className="bs-outcome-item bs-outcome-err">
+                                      <div>
+                                        <span className="status-pill status-crimson">
+                                          Error en IA
+                                        </span>
+                                        <small
+                                          style={{
+                                            display: 'block',
+                                            fontSize: 11,
+                                            color: 'var(--text-secondary)',
+                                            marginTop: 2,
+                                          }}
+                                        >
+                                          No se pudo generar este informe. Los demás informes
+                                          conservan su estado.
+                                        </small>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        className="button button-emerald button-sm"
+                                        onClick={() => handleRetryAiReport(job.id)}
                                       >
-                                        No se pudo generar este informe. Los demás informes
-                                        conservan su estado.
-                                      </small>
+                                        <RefreshCw size={13} /> Reintentar IA
+                                      </button>
                                     </div>
-                                    <button
-                                      type="button"
-                                      className="button button-emerald button-sm"
-                                      onClick={() => handleRetryAiReport(job.id)}
-                                    >
-                                      <RefreshCw size={13} /> Reintentar IA
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <div className="bs-outcome-item bs-outcome-ok">
-                                    <span className="status-pill status-blue">
-                                      <CheckCircle2 size={12} /> IA listo ({job.aiScore}%)
-                                    </span>
-                                    <button
-                                      type="button"
-                                      className="button button-secondary button-sm"
-                                      onClick={() => handleDownloadCertificate(job, 'ai')}
-                                    >
-                                      <Download size={13} /> Descargar IA
-                                    </button>
-                                  </div>
-                                )}
+                                  ) : (
+                                    <div className="bs-outcome-item bs-outcome-ok">
+                                      <span className="status-pill status-blue">
+                                        <CheckCircle2 size={12} /> IA listo ({job.aiScore}%)
+                                      </span>
+                                      <button
+                                        type="button"
+                                        className="button button-secondary button-sm"
+                                        onClick={() => handleDownloadCertificate(job, 'ai')}
+                                      >
+                                        <Download size={13} /> Descargar IA
+                                      </button>
+                                    </div>
+                                  ))}
                               </div>
                             </td>
                             <td>
@@ -1835,9 +2000,12 @@ export default function App() {
             <div className="upload-studio-grid">
               <section className="panel">
                 <div className="panel-header">
-                  <div>
-                    <h2>QuillBot · Parafraseador de Apoyo</h2>
-                    <p>Reformula pasajes con coincidencias antes de generar tu informe definitivo</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <QuillbotIcon size={28} />
+                    <div>
+                      <h2>QuillBot · Parafraseador de Apoyo</h2>
+                      <p>Reformula pasajes con coincidencias antes de generar tu informe definitivo</p>
+                    </div>
                   </div>
                   <div className="filter-tabs">
                     {[
@@ -1896,9 +2064,12 @@ export default function App() {
 
               <section className="panel">
                 <div className="panel-header">
-                  <div>
-                    <h2>Acceso Directo QuillBot</h2>
-                    <p>QuillBot es gratuito para clientes con cuenta activa</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <QuillbotIcon size={26} />
+                    <div>
+                      <h2>Acceso Directo QuillBot</h2>
+                      <p>QuillBot es gratuito para clientes con cuenta activa</p>
+                    </div>
                   </div>
                   <span className="status-pill status-emerald">Vigente</span>
                 </div>
@@ -2009,7 +2180,8 @@ export default function App() {
                       <th>Persona</th>
                       <th>Plan asignado</th>
                       <th>Estado</th>
-                      <th>Cuota diaria (Lima)</th>
+                      <th>Cuota de reportes</th>
+                      <th>Vencimiento (Fecha y Hora)</th>
                       <th>Dispositivos</th>
                       <th>Originality</th>
                       <th>Acciones</th>
@@ -2028,9 +2200,29 @@ export default function App() {
                           </div>
                         </td>
                         <td>
-                          <span className="code-chip">
-                            {u.role === 'admin' ? 'ADMINISTRADOR' : u.planName || 'Sin plan'}
-                          </span>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <span className="code-chip" style={{ width: 'fit-content' }}>
+                              {u.role === 'admin' ? 'ADMINISTRADOR' : u.planName || 'INSTRUCTOR BÁSICO'}
+                            </span>
+                            {u.role !== 'admin' && (
+                              <small
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  color:
+                                    u.accountType === 'student' ||
+                                    (u.planName || '').toUpperCase().includes('ESTUDIANTE')
+                                      ? 'var(--amber)'
+                                      : 'var(--brand-primary)',
+                                }}
+                              >
+                                {u.accountType === 'student' ||
+                                (u.planName || '').toUpperCase().includes('ESTUDIANTE')
+                                  ? 'Estudiante · Solo Similitud'
+                                  : 'Instructor (Asesor) · Similitud + IA'}
+                              </small>
+                            )}
+                          </div>
                         </td>
                         <td>
                           <span
@@ -2050,12 +2242,56 @@ export default function App() {
                           </span>
                         </td>
                         <td>
-                          {u.role === 'admin' ? (
-                            <span className="status-pill status-blue">Ilimitado</span>
+                          {u.role === 'admin' || u.daily?.unlimited || u.originalityApproved ? (
+                            <span className="status-pill status-blue">Reportes Ilimitados</span>
                           ) : (
                             <span className="code-chip">
-                              {u.daily?.remaining ?? 3} / {u.daily?.limit ?? 3} restantes
+                              {u.daily?.remaining ?? 7} / {u.daily?.limit ?? 7} al día
                             </span>
+                          )}
+                        </td>
+                        <td>
+                          {u.role === 'admin' ? (
+                            <span className="code-chip">Permanente</span>
+                          ) : (
+                            <input
+                              type="datetime-local"
+                              value={toDateTimeLocalValue(u.expiresAt)}
+                              onChange={(e) => {
+                                const newVal = e.target.value;
+                                if (!newVal) return;
+                                const isoDate = new Date(newVal).toISOString();
+                                const isExpired = new Date(newVal).getTime() <= Date.now();
+                                setUsers((prev) =>
+                                  prev.map((item) =>
+                                    item.id === u.id
+                                      ? {
+                                          ...item,
+                                          expiresAt: isoDate,
+                                          status: isExpired ? 'expired' : 'active',
+                                        }
+                                      : item
+                                  )
+                                );
+                                showNotification(
+                                  `Vencimiento de ${u.name} actualizado a ${new Date(
+                                    newVal
+                                  ).toLocaleString('es-PE', {
+                                    dateStyle: 'short',
+                                    timeStyle: 'short',
+                                  })}.`
+                                );
+                              }}
+                              style={{
+                                padding: '5px 8px',
+                                borderRadius: 8,
+                                border: '1px solid var(--border-color)',
+                                fontSize: 12,
+                                fontFamily: 'var(--font-mono)',
+                                background: 'var(--bg-surface)',
+                                color: 'var(--text-primary)',
+                              }}
+                            />
                           )}
                         </td>
                         <td>
@@ -2072,13 +2308,31 @@ export default function App() {
                               setUsers((prev) =>
                                 prev.map((item) =>
                                   item.id === u.id
-                                    ? { ...item, originalityApproved: checked }
+                                    ? {
+                                        ...item,
+                                        originalityApproved: checked,
+                                        daily: checked
+                                          ? {
+                                              ...item.daily,
+                                              unlimited: true,
+                                              limit: 999999,
+                                              remaining: 999999,
+                                            }
+                                          : {
+                                              ...item.daily,
+                                              unlimited: false,
+                                              limit: 7,
+                                              remaining: 7,
+                                            },
+                                      }
                                     : item
                                 )
                               );
                               showNotification(
                                 `Turnitin Originality ${
-                                  checked ? 'aprobado' : 'deshabilitado'
+                                  checked
+                                    ? 'aprobado (Reportes ilimitados)'
+                                    : 'deshabilitado (7 reportes al día en Feedback)'
                                 } para ${u.name}`
                               );
                             }}
@@ -2114,8 +2368,8 @@ export default function App() {
                                           status: 'active',
                                           daily: {
                                             ...item.daily,
-                                            limit: (item.daily?.limit || 3) + 3,
-                                            remaining: (item.daily?.remaining || 3) + 3,
+                                            limit: (item.daily?.limit || 7) + 3,
+                                            remaining: (item.daily?.remaining || 7) + 3,
                                           },
                                         }
                                       : item
@@ -2130,7 +2384,7 @@ export default function App() {
                               className="button button-secondary button-sm"
                               href={`https://wa.me/51987654321?text=${encodeURIComponent(
                                 `Hola ${u.name}, tu acceso a TurnitinPE (${
-                                  u.planName || 'Reportes IA + Similitud'
+                                  u.planName || 'INSTRUCTOR BÁSICO'
                                 }) está activo en https://turnitinpe.com`
                               )}`}
                               target="_blank"
@@ -2153,61 +2407,74 @@ export default function App() {
              ========================================== */}
           {activeTab === 'plans' && (
             <div className="plans-grid">
-              {plans.map((plan) => (
-                <article key={plan.id} className="plan-card">
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <span className="code-chip">
-                      {plan.billingMode === 'credits'
-                        ? 'POR CRÉDITOS'
-                        : plan.modality === 'instructor'
-                        ? 'INSTRUCTOR'
-                        : 'ESTUDIANTE'}
-                    </span>
-                    <span className="status-pill status-emerald">Activo</span>
-                  </div>
+              {plans.map((plan) => {
+                const isStudentPlan =
+                  plan.modality === 'student' ||
+                  plan.accountType === 'student' ||
+                  (plan.name || '').toUpperCase().includes('ESTUDIANTE');
+                const isUnlimitedPlan =
+                  plan.serviceType === 'originality' ||
+                  plan.feedbackPolicy?.mode === 'unlimited';
+                return (
+                  <article key={plan.id} className="plan-card">
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <span className="code-chip">
+                        {isStudentPlan
+                          ? 'ESTUDIANTE · SOLO SIMILITUD'
+                          : 'INSTRUCTOR (ASESOR) · SIMILITUD + IA'}
+                      </span>
+                      <span className="status-pill status-emerald">Activo</span>
+                    </div>
 
-                  <div>
-                    <h2 style={{ fontSize: 20 }}>{plan.name}</h2>
-                    <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
-                      {plan.description}
-                    </p>
-                  </div>
+                    <div>
+                      <h2 style={{ fontSize: 20 }}>{plan.name}</h2>
+                      <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
+                        {plan.description}
+                      </p>
+                    </div>
 
-                  <div className="plan-price-row">
-                    <strong>{formatCurrency(plan.priceMinor, plan.currency)}</strong>
-                    <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-                      / {plan.interval === 'once' ? 'pago único' : 'mes'}
-                    </span>
-                  </div>
+                    <div className="plan-price-row">
+                      <strong>{formatCurrency(plan.priceMinor, plan.currency)}</strong>
+                      <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+                        / {plan.interval === 'once' ? 'pago único' : 'mes'}
+                      </span>
+                    </div>
 
-                  <ul className="plan-features-list">
-                    <li>
-                      <CheckCircle2 size={15} style={{ color: 'var(--emerald)' }} />
-                      {plan.feedbackPolicy?.mode === 'credits'
-                        ? '1 crédito por PDF · IA + Similitud'
-                        : `${plan.feedbackPolicy?.dailyLimit || 7} PDF por día · IA + Similitud`}
-                    </li>
-                    <li>
-                      <CheckCircle2 size={15} style={{ color: 'var(--emerald)' }} />
-                      Turnitin Feedback habilitado (Sin depósito)
-                    </li>
-                    <li>
-                      <CheckCircle2 size={15} style={{ color: 'var(--emerald)' }} />
-                      QuillBot incluido gratuitamente
-                    </li>
-                    <li>
-                      <Users size={15} style={{ color: 'var(--brand-primary)' }} />
-                      <strong>{plan.assignedUsers} cuentas asignadas</strong>
-                    </li>
-                  </ul>
-                </article>
-              ))}
+                    <ul className="plan-features-list">
+                      <li>
+                        <CheckCircle2 size={15} style={{ color: 'var(--emerald)' }} />
+                        <strong>
+                          {isStudentPlan
+                            ? 'Solo muestra reporte de Similitud'
+                            : 'Muestra reporte de Similitud + IA'}
+                        </strong>
+                      </li>
+                      <li>
+                        <CheckCircle2 size={15} style={{ color: 'var(--emerald)' }} />
+                        {isUnlimitedPlan
+                          ? 'Reportes PDF ilimitados (Turnitin Originality)'
+                          : `${
+                              plan.feedbackPolicy?.dailyLimit || 7
+                            } reportes PDF al día (Turnitin Feedback)`}
+                      </li>
+                      <li>
+                        <QuillbotIcon size={16} />
+                        QuillBot incluido gratuitamente
+                      </li>
+                      <li>
+                        <Users size={15} style={{ color: 'var(--brand-primary)' }} />
+                        <strong>{plan.assignedUsers} cuentas asignadas</strong>
+                      </li>
+                    </ul>
+                  </article>
+                );
+              })}
             </div>
           )}
 
@@ -2415,7 +2682,9 @@ export default function App() {
               <div className="panel-header">
                 <div>
                   <h2>Historial de cuotas de reportes (Día en Lima: 2026-11-08)</h2>
-                  <p>Acredita saldo de reportes confirmado o ajusta el límite diario individual</p>
+                  <p>
+                    Turnitin Feedback: 7 reportes al día · Turnitin Originality: Reportes ilimitados
+                  </p>
                 </div>
               </div>
 
@@ -2425,7 +2694,7 @@ export default function App() {
                     <tr>
                       <th>Cliente</th>
                       <th>Correo</th>
-                      <th>Límite Configurado</th>
+                      <th>Servicio / Límite</th>
                       <th>Consumidos Hoy</th>
                       <th>Reservas</th>
                       <th>Restantes</th>
@@ -2442,14 +2711,26 @@ export default function App() {
                           </td>
                           <td>{u.email}</td>
                           <td>
-                            <span className="code-chip">{u.daily?.limit ?? 3} PDF / día</span>
+                            {u.daily?.unlimited || u.originalityApproved ? (
+                              <span className="status-pill status-blue">
+                                Ilimitado (Originality)
+                              </span>
+                            ) : (
+                              <span className="code-chip">
+                                {u.daily?.limit ?? 7} PDF / día (Feedback)
+                              </span>
+                            )}
                           </td>
                           <td>{u.daily?.consumed ?? 0}</td>
                           <td>{u.daily?.reserved ?? 0}</td>
                           <td>
-                            <span className="status-pill status-emerald">
-                              {u.daily?.remaining ?? 3} disponibles
-                            </span>
+                            {u.daily?.unlimited || u.originalityApproved ? (
+                              <span className="status-pill status-blue">Ilimitados</span>
+                            ) : (
+                              <span className="status-pill status-emerald">
+                                {u.daily?.remaining ?? 7} disponibles
+                              </span>
+                            )}
                           </td>
                           <td>
                             <button
@@ -2463,8 +2744,8 @@ export default function App() {
                                           ...item,
                                           daily: {
                                             ...item.daily,
-                                            limit: (item.daily?.limit || 3) + 5,
-                                            remaining: (item.daily?.remaining || 3) + 5,
+                                            limit: (item.daily?.limit || 7) + 5,
+                                            remaining: (item.daily?.remaining || 7) + 5,
                                           },
                                         }
                                       : item
@@ -2631,19 +2912,53 @@ export default function App() {
                 />
               </label>
 
+              <label className="field">
+                Plan y modalidad de cuenta
+                <select
+                  value={newUserForm.planId}
+                  onChange={(e) => {
+                    const planId = e.target.value;
+                    const chosen = plans.find((p) => p.id === planId) || plans[0];
+                    setNewUserForm({
+                      ...newUserForm,
+                      planId,
+                      serviceType: chosen?.serviceType || 'feedback',
+                    });
+                  }}
+                >
+                  {plans.map((p) => {
+                    const isStud =
+                      p.modality === 'student' ||
+                      p.accountType === 'student' ||
+                      (p.name || '').toUpperCase().includes('ESTUDIANTE');
+                    const isUnlim =
+                      p.serviceType === 'originality' ||
+                      p.feedbackPolicy?.mode === 'unlimited';
+                    return (
+                      <option key={p.id} value={p.id}>
+                        {p.name} — {formatCurrency(p.priceMinor, p.currency)} (
+                        {isStud ? 'Solo Similitud' : 'Similitud + IA'} ·{' '}
+                        {isUnlim ? 'Ilimitado' : '7 reportes al día'})
+                      </option>
+                    );
+                  })}
+                </select>
+              </label>
+
               <div className="form-grid">
                 <label className="field">
-                  Plan asignado
-                  <select
-                    value={newUserForm.planId}
-                    onChange={(e) => setNewUserForm({ ...newUserForm, planId: e.target.value })}
-                  >
-                    {plans.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({formatCurrency(p.priceMinor, p.currency)})
-                      </option>
-                    ))}
-                  </select>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Calendar size={14} style={{ color: 'var(--brand-primary)' }} />
+                    Fecha y hora de vencimiento
+                  </span>
+                  <input
+                    type="datetime-local"
+                    value={newUserForm.expiresAt}
+                    onChange={(e) =>
+                      setNewUserForm({ ...newUserForm, expiresAt: e.target.value })
+                    }
+                    required
+                  />
                 </label>
 
                 <label className="field">
@@ -2660,7 +2975,103 @@ export default function App() {
                 </label>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
+              {/* Botones rápidos para configurar el vencimiento con fecha y hora */}
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '10px 12px',
+                  borderRadius: 10,
+                  background: 'var(--bg-surface-subtle)',
+                  border: '1px solid var(--border-color)',
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 12,
+                    color: 'var(--text-secondary)',
+                    fontWeight: 600,
+                    marginRight: 4,
+                  }}
+                >
+                  Duración rápida:
+                </span>
+                {[
+                  { label: '+1 día', days: 1 },
+                  { label: '+7 días', days: 7 },
+                  { label: '+15 días', days: 15 },
+                  { label: '+1 mes (30d)', days: 30 },
+                  { label: '+3 meses', days: 90 },
+                  { label: '+1 año', days: 365 },
+                ].map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    className="button button-secondary button-sm"
+                    style={{ padding: '4px 9px', fontSize: 11.5 }}
+                    onClick={() => {
+                      const target = new Date(Date.now() + preset.days * 86400000);
+                      setNewUserForm({
+                        ...newUserForm,
+                        expiresAt: toDateTimeLocalValue(target),
+                      });
+                    }}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Resumen visual de la configuración de la cuenta */}
+              {(() => {
+                const selectedPlanObj =
+                  plans.find((p) => p.id === newUserForm.planId) || plans[0];
+                const isStudentSel =
+                  selectedPlanObj?.modality === 'student' ||
+                  selectedPlanObj?.accountType === 'student' ||
+                  (selectedPlanObj?.name || '').toUpperCase().includes('ESTUDIANTE');
+                const isUnlimSel =
+                  selectedPlanObj?.serviceType === 'originality' ||
+                  selectedPlanObj?.feedbackPolicy?.mode === 'unlimited';
+                return (
+                  <div
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: 10,
+                      background: isUnlimSel
+                        ? 'rgba(37, 99, 235, 0.08)'
+                        : 'var(--emerald-soft)',
+                      border: '1px solid var(--border-color)',
+                      fontSize: 12.5,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: 8,
+                    }}
+                  >
+                    <span>
+                      <strong>{selectedPlanObj?.name}:</strong>{' '}
+                      {isStudentSel ? 'Solo Similitud' : 'Similitud + IA'} ·{' '}
+                      {isUnlimSel ? 'Reportes ilimitados' : '7 reportes al día'} (
+                      {formatCurrency(selectedPlanObj?.priceMinor || 8000, 'PEN')})
+                    </span>
+                    <span>
+                      <strong>Vence:</strong>{' '}
+                      {newUserForm.expiresAt
+                        ? new Date(newUserForm.expiresAt).toLocaleString('es-PE', {
+                            dateStyle: 'medium',
+                            timeStyle: 'short',
+                          })
+                        : 'Sin definir'}
+                    </span>
+                  </div>
+                );
+              })()}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
                 <button
                   type="button"
                   className="button button-secondary"

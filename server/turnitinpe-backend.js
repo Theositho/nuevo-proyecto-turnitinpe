@@ -23,6 +23,18 @@ export const TURNITIN2_CONFIG = {
   },
   providers: ['originalityplus', 'academiacx'],
   services: ['feedback', 'originality'],
+  servicePolicies: {
+    feedback: {
+      mode: 'daily',
+      dailyReportLimit: 7, // 7 reportes al dia para cuentas de Turnitin Feedback
+      unlimitedReports: false,
+    },
+    originality: {
+      mode: 'unlimited',
+      dailyReportLimit: null, // Reportes ilimitados para cuentas de Turnitin Originality
+      unlimitedReports: true,
+    },
+  },
   timezone: 'America/Lima',
 };
 
@@ -49,20 +61,36 @@ export function getLimaDayWindow(now = new Date()) {
 
 /**
  * Calcula el resumen de cuota diaria de reportes PDF (/api/private/daily-report-limits)
- * - Feedback consume cupo diario (ej. 7 PDF/dia en ESTUDIANTE PRO)
- * - Originality con independentMode=true puede operar sin consumir cupo de Feedback
+ * - Cuentas de Turnitin Feedback tienen 7 reportes al dia (7 PDF/dia)
+ * - Cuentas de Turnitin Originality tienen reportes ilimitados
  * - Reembolsa automaticamente (`released`) si ambos reportes (IA y Similitud) fallan
  */
-export function computeDailyQuotaSummary(user, activeJobs = [], extraUnits = 0) {
+export function computeDailyQuotaSummary(user, activeJobs = [], extraUnits = 0, service = 'feedback') {
   const { resetsAt } = getLimaDayWindow();
-  const baseLimit = Number(user.dailyReportLimit ?? 7);
+
+  if (service === 'originality' || user.serviceType === 'originality' || user.unlimitedReports) {
+    return {
+      service: 'originality',
+      limit: null,
+      configuredLimit: null,
+      baseLimit: null,
+      additional: 0,
+      reserved: 0,
+      consumed: activeJobs.filter((j) => j.service === 'originality' && j.state === 'completed').length,
+      remaining: null,
+      unlimited: true,
+      resetsAt,
+    };
+  }
+
+  const baseLimit = Number(user.dailyReportLimit ?? TURNITIN2_CONFIG.servicePolicies.feedback.dailyReportLimit);
   const configuredLimit = baseLimit + Number(extraUnits || 0);
 
   let reserved = 0;
   let consumed = 0;
 
   for (const job of activeJobs) {
-    if (job.service === 'originality' && job.independentMode) continue;
+    if (job.service === 'originality') continue;
     if (job.state === 'queued' || job.state === 'leased' || job.state === 'processing') {
       reserved += 1;
     } else if (job.state === 'completed') {
@@ -74,6 +102,7 @@ export function computeDailyQuotaSummary(user, activeJobs = [], extraUnits = 0) 
 
   const remaining = Math.max(0, configuredLimit - reserved - consumed);
   return {
+    service: 'feedback',
     limit: configuredLimit,
     configuredLimit,
     baseLimit,
@@ -81,7 +110,7 @@ export function computeDailyQuotaSummary(user, activeJobs = [], extraUnits = 0) 
     reserved,
     consumed,
     remaining,
-    unlimited: Boolean(user.unlimitedReports),
+    unlimited: false,
     resetsAt,
   };
 }
