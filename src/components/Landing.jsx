@@ -200,7 +200,6 @@ export default function Landing({ onLogin, onTryDemo, currentUser, onReturnToPla
               </svg>
               <span>turnitin<b>pe</b></span>
             </a>
-            <span className="lp-brand-badge">Originality · IA 2026</span>
           </div>
 
           <nav className="lp-nav">
