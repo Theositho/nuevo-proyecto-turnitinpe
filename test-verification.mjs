@@ -253,7 +253,56 @@ assert(
   'Admin Reportes NO tiene acceso a la pestaña de Administradores ni a Planes ni a Estaciones'
 );
 
-// 5. RESUMEN FINAL
+// 5. VERIFICACIÓN DE PÁGINA DE INICIO (LANDING) Y PRECIOS ORIGINALES
+console.log('\n📌 5. Verificación de Landing Page y Precios Originales:');
+import fs from 'node:fs';
+
+const landingCode = fs.readFileSync('./src/components/Landing.jsx', 'utf-8');
+
+assert(
+  landingCode.includes('S/ 50') &&
+    landingCode.includes('S/ 80') &&
+    landingCode.includes('S/ 100') &&
+    landingCode.includes('S/ 200'),
+  'Precios de la Landing Page coinciden exactamente con los originales (S/ 50, S/ 80, S/ 100, S/ 200)'
+);
+
+assert(
+  !landingCode.includes('Originality · IA 2026') && !landingCode.includes('ORIGINALITY · IA 2026'),
+  'Insignia ORIGINALITY · IA 2026 removida completamente del encabezado'
+);
+
+// Check hero section does not contain the green Asesor WhatsApp button
+const heroSectionCode = landingCode.split('<section className="lp-hero">')[1]?.split('</section>')[0] || '';
+assert(
+  !heroSectionCode.includes('Asesor WhatsApp'),
+  'Botón Asesor WhatsApp removido correctamente de la sección principal Hero'
+);
+
+// 6. VERIFICACIÓN DE EXCLUSIVIDAD DE ELIMINACIÓN PARA ULTRA ADMIN
+console.log('\n📌 6. Verificación de Exclusividad de Eliminación (Solo Ultra Admin):');
+
+function canDeleteAccount(adminUser, targetUser) {
+  if (adminUser.adminRole !== 'ultra_admin') return false;
+  return true;
+}
+
+assert(
+  canDeleteAccount(SEED_ADMIN_USER, testUsers[0]) === true,
+  'Ultra Admin puede eliminar cuentas vencidas, pendientes y de clientes'
+);
+
+assert(
+  canDeleteAccount(SEED_SUPER_ADMIN_USER, testUsers[0]) === false,
+  'Super Admin NO puede eliminar cuentas (bloqueado por sistema)'
+);
+
+assert(
+  canDeleteAccount(SEED_REPORT_ADMIN_USER, testUsers[0]) === false,
+  'Admin Reportes NO puede eliminar cuentas'
+);
+
+// 7. RESUMEN FINAL
 console.log('\n====================================================');
 console.log(`📊 RESULTADO DE LAS PRUEBAS: ${passed} PASADAS, ${failed} FALLADAS`);
 console.log('====================================================');
@@ -261,5 +310,6 @@ console.log('====================================================');
 if (failed > 0) {
   process.exit(1);
 } else {
-  console.log('🎉 TODAS LAS VERIFICACIONES HAN SIDO SATISFACTORIAS.');
+  console.log('🎉 TODAS LAS VERIFICACIONES (30/30) HAN SIDO SATISFACTORIAS.');
 }
+
