@@ -247,6 +247,17 @@ export default function App() {
     sellerWhatsapp: '+51987654321',
   });
 
+  // New Admin Reportes (vendedor) form state — solo Ultra Admin y Super Admin
+  const [showNewAdminModal, setShowNewAdminModal] = useState(false);
+  const [newAdminForm, setNewAdminForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    whatsapp: '',
+    deviceLimit: 2,
+  });
+  const [newAdminError, setNewAdminError] = useState('');
+
   // New Plan form state
   const [newPlanForm, setNewPlanForm] = useState({
     name: '',
@@ -295,6 +306,10 @@ export default function App() {
           'Sesión iniciada como Admin Reportes (Solo gestiona las cuentas que vende)'
         );
       } else if (matched) {
+        if (matched.passwordPlain && loginPassword !== matched.passwordPlain) {
+          showNotification('Contraseña incorrecta para esta cuenta.');
+          return;
+        }
         setUser(matched);
         setViewMode(matched.role === 'admin' ? 'admin' : 'member');
         showNotification(`Bienvenido de nuevo, ${matched.name}`);
@@ -450,6 +465,71 @@ export default function App() {
     showNotification(
       `Descargando PDF de ${type === 'ai' ? 'Detección de IA' : 'Similitud'} (#${job.displayCode})`
     );
+  };
+
+  const openNewAdminModal = () => {
+    setNewAdminError('');
+    setNewAdminForm({ name: '', email: '', password: '', whatsapp: '', deviceLimit: 2 });
+    setShowNewAdminModal(true);
+  };
+
+  const handleCreateReportAdmin = (e) => {
+    e.preventDefault();
+    if (!(isUltraAdmin || isSuperAdmin)) {
+      setNewAdminError('Solo Ultra Admin y Super Admin pueden crear cuentas de Admin Reportes.');
+      return;
+    }
+    const name = newAdminForm.name.trim();
+    const email = newAdminForm.email.trim().toLowerCase();
+    const password = newAdminForm.password;
+    if (!name || !email) {
+      setNewAdminError('Completa el nombre y el correo del vendedor.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setNewAdminError('El correo no es válido.');
+      return;
+    }
+    if (password.length < 12) {
+      setNewAdminError('La contraseña inicial debe tener al menos 12 caracteres.');
+      return;
+    }
+    if (users.some((u) => (u.email || '').toLowerCase() === email)) {
+      setNewAdminError('Ya existe una cuenta con ese correo.');
+      return;
+    }
+    const created = {
+      id: `adm-rep-${Date.now().toString(36)}`,
+      name,
+      email,
+      passwordPlain: password,
+      role: 'admin',
+      adminRole: 'report_admin',
+      adminRoleLabel: 'ADMIN REPORTES (SOLO SUS VENTAS)',
+      reviewAccess: 'instructor',
+      status: 'active',
+      deviceLimit: Math.min(Number(newAdminForm.deviceLimit) || 2, 5),
+      deviceCount: 0,
+      deviceCurrency: 'PEN',
+      nvidiaRequestsPerDay: 100,
+      creditsBalance: 0,
+      providerWhatsapp: newAdminForm.whatsapp.trim(),
+      adminPermissions: ['clients.manage_own', 'reports.assign_units'],
+      feedbackAccess: {
+        enabled: true,
+        mode: 'unlimited',
+        reportKinds: ['ai', 'similarity'],
+        canSubmit: true,
+      },
+      dailyReportLimit: { unlimitedAi: true, limit: null, remaining: null },
+      createdById: user?.id,
+      createdByName: user?.name,
+      createdAt: new Date().toISOString(),
+      lastLogin: null,
+    };
+    setUsers((prev) => [created, ...prev]);
+    setShowNewAdminModal(false);
+    showNotification(`Admin Reportes creado: ${name} (${email})`);
   };
 
   const handleCreateUser = (e) => {
@@ -1373,6 +1453,15 @@ export default function App() {
                     )
                   </button>
                 </>
+              )}
+              {activeTab === 'users' && (isUltraAdmin || isSuperAdmin) && (
+                <button
+                  type="button"
+                  className="button button-secondary"
+                  onClick={openNewAdminModal}
+                >
+                  <ShieldCheck size={16} /> Crear Admin Reportes
+                </button>
               )}
               {activeTab === 'users' && (
                 <button
@@ -2464,8 +2553,10 @@ export default function App() {
                   marginBottom: 16,
                 }}
               >
-                {SEED_ADMIN_CREDENTIALS.map((cred) => {
-                  const isCurrentCred = user?.id === cred.id || user?.adminRole === cred.adminRole;
+                {users
+                  .filter((u) => u.role === 'admin' && (!isReportAdmin || u.id === user?.id))
+                  .map((cred) => {
+                  const isCurrentCred = user?.id === cred.id;
                   return (
                     <div
                       key={cred.id}
@@ -2604,6 +2695,15 @@ export default function App() {
                         placeholder="Buscar cuenta por nombre, correo o vendedor…"
                       />
                     </div>
+                    {(isUltraAdmin || isSuperAdmin) && (
+                      <button
+                        type="button"
+                        className="button button-secondary button-sm"
+                        onClick={openNewAdminModal}
+                      >
+                        <ShieldCheck size={14} /> Crear Admin Reportes
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="button button-primary button-sm"
@@ -3421,6 +3521,111 @@ export default function App() {
           onDownloadCertificate={handleDownloadCertificate}
           onRetryAiReport={handleRetryAiReport}
         />
+      )}
+
+      {/* Create Admin Reportes Modal — solo Ultra Admin y Super Admin */}
+      {showNewAdminModal && (isUltraAdmin || isSuperAdmin) && (
+        <div className="modal-backdrop" onClick={() => setShowNewAdminModal(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <span className="page-eyebrow">NUEVO VENDEDOR</span>
+                <h2>Crear Admin Reportes</h2>
+              </div>
+              <button className="icon-btn" onClick={() => setShowNewAdminModal(false)}>
+                <X size={18} />
+              </button>
+            </div>
+            <form
+              onSubmit={handleCreateReportAdmin}
+              style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
+            >
+              {newAdminError && (
+                <div className="error-banner" role="alert">
+                  {newAdminError}
+                </div>
+              )}
+              <label className="field">
+                Nombre del vendedor
+                <input
+                  type="text"
+                  required
+                  maxLength={100}
+                  value={newAdminForm.name}
+                  onChange={(e) => setNewAdminForm({ ...newAdminForm, name: e.target.value })}
+                  placeholder="Ej. Juan Pérez"
+                />
+              </label>
+              <label className="field">
+                Correo del vendedor
+                <input
+                  type="email"
+                  required
+                  value={newAdminForm.email}
+                  onChange={(e) => setNewAdminForm({ ...newAdminForm, email: e.target.value })}
+                  placeholder="vendedor@correo.com"
+                />
+              </label>
+              <label className="field">
+                Contraseña inicial
+                <input
+                  type="text"
+                  required
+                  minLength={12}
+                  maxLength={256}
+                  autoComplete="new-password"
+                  value={newAdminForm.password}
+                  onChange={(e) => setNewAdminForm({ ...newAdminForm, password: e.target.value })}
+                  placeholder="Al menos 12 caracteres"
+                />
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <label className="field">
+                  WhatsApp del vendedor
+                  <input
+                    type="tel"
+                    value={newAdminForm.whatsapp}
+                    onChange={(e) =>
+                      setNewAdminForm({ ...newAdminForm, whatsapp: e.target.value })
+                    }
+                    placeholder="+51 9XX XXX XXX"
+                  />
+                </label>
+                <label className="field">
+                  Dispositivos permitidos
+                  <input
+                    type="number"
+                    min={1}
+                    max={5}
+                    value={newAdminForm.deviceLimit}
+                    onChange={(e) =>
+                      setNewAdminForm({ ...newAdminForm, deviceLimit: e.target.value })
+                    }
+                  />
+                </label>
+              </div>
+              <div className="info-callout" style={{ fontSize: 12.5 }}>
+                <ShieldCheck size={18} />
+                <p style={{ margin: 0 }}>
+                  El Admin Reportes solo puede crear y ver las cuentas que él mismo vende. No puede
+                  eliminar cuentas, crear administradores ni modificar planes.
+                </p>
+              </div>
+              <div className="modal-actions" style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  className="button button-secondary"
+                  onClick={() => setShowNewAdminModal(false)}
+                >
+                  Cancelar
+                </button>
+                <button type="submit" className="button button-primary">
+                  <ShieldCheck size={16} /> Crear Admin Reportes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {/* Create User Modal */}
