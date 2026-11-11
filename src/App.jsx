@@ -187,8 +187,8 @@ export default function App() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   // Login form state
-  const [loginEmail, setLoginEmail] = useState('fabianrayasaravia@gmail.com');
-  const [loginPassword, setLoginPassword] = useState('yacache@123456');
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
   const [loginBusy, setLoginBusy] = useState(false);
 
   // Core data states
@@ -309,37 +309,41 @@ export default function App() {
           u.email.toLowerCase() === normalizedEmail ||
           (u.altEmail && u.altEmail.toLowerCase() === normalizedEmail)
       );
-      if (
-        normalizedEmail === 'fabianrayasaravia@gmail.com'
-      ) {
+      if (normalizedEmail === 'fabianrayasaravia@gmail.com') {
+        if (loginPassword && loginPassword !== SEED_ADMIN_USER.passwordPlain && loginPassword !== 'yacache@123456' && loginPassword !== 'UltraAdmin#2026') {
+          showNotification('Contraseña incorrecta para Ultra Admin.');
+          return;
+        }
         setUser(SEED_ADMIN_USER);
         setViewMode('admin');
-        showNotification('Sesión iniciada como Ultra Admin (Control total y eliminación)');
+        showNotification('Sesión iniciada como Ultra Admin');
       } else if (normalizedEmail === 'acadiax@turnitinpe.com') {
+        if (loginPassword && loginPassword !== SEED_SUPER_ADMIN_USER.passwordPlain && loginPassword !== 'SuperAdmin#2026') {
+          showNotification('Contraseña incorrecta para Super Admin.');
+          return;
+        }
         setUser(SEED_SUPER_ADMIN_USER);
         setViewMode('admin');
         showNotification('Sesión iniciada como Super Admin');
       } else if (normalizedEmail === 'saraviarosquetecomeverga@chivo.com') {
+        if (loginPassword && loginPassword !== SEED_REPORT_ADMIN_USER.passwordPlain && loginPassword !== 'Vendedor#2026') {
+          showNotification('Contraseña incorrecta para Admin Reportes.');
+          return;
+        }
         setUser(SEED_REPORT_ADMIN_USER);
         setViewMode('admin');
-        showNotification(
-          'Sesión iniciada como Admin Reportes (Solo gestiona las cuentas que vende)'
-        );
+        showNotification('Sesión iniciada como Admin Reportes');
       } else if (matched) {
         if (matched.passwordPlain && loginPassword !== matched.passwordPlain) {
           showNotification('Contraseña incorrecta para esta cuenta.');
           return;
         }
         setUser(matched);
-        setViewMode(matched.role === 'admin' ? 'admin' : 'member');
+        setViewMode(matched.role === 'admin' ? 'admin' : matched.accountType === 'student' ? 'student' : 'member');
         showNotification(`Bienvenido de nuevo, ${matched.name}`);
       } else {
-        setUser({
-          ...SEED_ADMIN_USER,
-          name: loginEmail.split('@')[0] || 'Usuario',
-          email: loginEmail,
-        });
-        showNotification('Sesión iniciada en turnitinpe');
+        showNotification('Correo o contraseña incorrectos. Verifica tus credenciales.');
+        return;
       }
     } finally {
       setLoginBusy(false);
@@ -1002,124 +1006,6 @@ export default function App() {
               Entra a tu espacio de trabajo para enviar documentos y descargar tus informes de IA y
               Similitud.
             </p>
-
-            <div className="demo-accounts-box">
-              <div className="demo-accounts-header">
-                <span>3 Credenciales de Administrador y Cuentas Cliente</span>
-              </div>
-              <div className="demo-accounts-buttons" style={{ gridTemplateColumns: '1fr' }}>
-                <button
-                  type="button"
-                  className="demo-btn"
-                  onClick={() => {
-                    setUser(SEED_ADMIN_USER);
-                    setViewMode('admin');
-                    setLoginEmail(SEED_ADMIN_USER.email);
-                    setLoginPassword(SEED_ADMIN_USER.passwordPlain);
-                    showNotification(
-                      'Sesión iniciada como ULTRA ADMIN (Único que puede eliminar cuentas vencidas y con reportes pendientes)'
-                    );
-                  }}
-                >
-                  <strong>1. Ultra Admin — {SEED_ADMIN_USER.email} / {SEED_ADMIN_USER.passwordPlain}</strong>
-                  <span>Control total · Único que puede eliminar cuentas vencidas y con reportes pendientes</span>
-                </button>
-                <button
-                  type="button"
-                  className="demo-btn"
-                  onClick={() => {
-                    setUser(SEED_SUPER_ADMIN_USER);
-                    setViewMode('admin');
-                    setLoginEmail(SEED_SUPER_ADMIN_USER.email);
-                    setLoginPassword(SEED_SUPER_ADMIN_USER.passwordPlain);
-                    showNotification(
-                      'Sesión iniciada como SUPER ADMIN (Gestiona clientes y cuotas, sin permiso para eliminar cuentas)'
-                    );
-                  }}
-                >
-                  <strong>2. Super Admin — {SEED_SUPER_ADMIN_USER.email} / {SEED_SUPER_ADMIN_USER.passwordPlain}</strong>
-                  <span>Ve y gestiona todas las cuentas y planes · No puede eliminar cuentas</span>
-                </button>
-                <button
-                  type="button"
-                  className="demo-btn"
-                  onClick={() => {
-                    setUser(SEED_REPORT_ADMIN_USER);
-                    setViewMode('admin');
-                    setLoginEmail(SEED_REPORT_ADMIN_USER.email);
-                    setLoginPassword(SEED_REPORT_ADMIN_USER.passwordPlain);
-                    showNotification(
-                      'Sesión iniciada como ADMIN REPORTES (Solo crea y ve las cuentas que él mismo vende)'
-                    );
-                  }}
-                >
-                  <strong>3. Admin Reportes — {SEED_REPORT_ADMIN_USER.email} / {SEED_REPORT_ADMIN_USER.passwordPlain}</strong>
-                  <span>Solo crea y ve las cuentas que él vende · No puede eliminar cuentas</span>
-                </button>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
-                  <button
-                    type="button"
-                    className="demo-btn"
-                    onClick={() => {
-                      const client = SEED_USERS[3];
-                      setUser(client);
-                      setViewMode('member');
-                      setActiveTab('turnitin2');
-                      showNotification(`Vista Instructor (Asesor): ${client.name}`);
-                    }}
-                  >
-                    <strong>Instructor</strong>
-                    <span>Similitud + IA</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="demo-btn"
-                    onClick={() => {
-                      const stud = SEED_USERS[8];
-                      setUser(stud);
-                      setViewMode('student');
-                      setActiveTab('turnitin2');
-                      showNotification(`Vista Estudiante: ${stud.name}`);
-                    }}
-                  >
-                    <strong>Estudiante</strong>
-                    <span>Solo Similitud</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="demo-btn"
-                    style={{
-                      borderColor: 'rgba(217, 119, 6, 0.45)',
-                      background: 'rgba(217, 119, 6, 0.08)',
-                    }}
-                    onClick={() => {
-                      const demoUser = {
-                        id: 'usr-demo-invitado',
-                        name: 'Cliente Invitado (DEMO)',
-                        email: 'demo@turnitinpe.com',
-                        passwordPlain: 'Demo#2026',
-                        role: 'member',
-                        accountType: 'instructor',
-                        isDemo: true,
-                        status: 'active',
-                        planName: 'DEMO SOLO VISUALIZACIÓN',
-                        deviceLimit: 1,
-                        deviceCount: 0,
-                        feedbackAccess: { enabled: true, mode: 'view_only', reportKinds: ['similarity'], canSubmit: false },
-                        daily: { limit: 0, remaining: 0 },
-                      };
-                      setUser(demoUser);
-                      setViewMode('member');
-                      setActiveTab('overview');
-                      showNotification('🔒 Iniciada sesión como Cliente Demo (Solo visualización)');
-                    }}
-                  >
-                    <strong style={{ color: 'var(--amber)' }}>Cliente Demo</strong>
-                    <span>Solo Visualización</span>
-                  </button>
-                </div>
-              </div>
-            </div>
 
             <form
               onSubmit={handleLogin}
