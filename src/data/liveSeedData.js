@@ -87,7 +87,7 @@ export const SEED_REPORT_ADMIN_USER = {
   createdById: '6e5ecc58-98df-473f-9daa-242ecf83c00c',
   role: 'admin',
   adminRole: 'report_admin',
-  adminRoleLabel: 'ADMIN REPORTES (SOLO SUS VENTAS)',
+  adminRoleLabel: 'ADMIN REPORTES',
   reviewAccess: 'instructor',
   status: 'active',
   deviceLimit: 2,

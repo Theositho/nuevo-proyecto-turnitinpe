@@ -266,6 +266,17 @@ export default function App() {
     dailyLimit: 7,
   });
 
+  // Modal y formulario para "Crear Demo" (sección independiente)
+  const [showDemoModal, setShowDemoModal] = useState(false);
+  const [demoForm, setDemoForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    expiresAt: toDateTimeLocalValue(new Date(Date.now() + 7 * 86400000)), // 7 días de demo
+    notes: 'Demo solo visualización (sin descarga ni edición)',
+  });
+  const [demoFormError, setDemoFormError] = useState('');
+
   const showNotification = (message) => {
     setToast(message);
     setTimeout(() => {
@@ -349,6 +360,7 @@ export default function App() {
 
   const handleFileUploadSubmit = (e) => {
     e.preventDefault();
+    const isDemoUser = !!user?.isDemo;
     const chosenName = uploadFileName.trim() || 'Documento_Revision_Turnitin_2026.pdf';
     setIsUploading(true);
     setUploadStage(1);
@@ -388,7 +400,8 @@ export default function App() {
         pages: 58,
         words: 14820,
         kinds,
-        state: 'completed',
+        state: isDemoUser ? 'demo_locked' : 'completed',
+        isDemoFile: isDemoUser,
         similarityScore: simScore,
         aiScore,
         createdAt: new Date().toISOString(),
@@ -398,8 +411,8 @@ export default function App() {
           similarity: `sim-${nextCode}.pdf`,
         },
         reportStates: {
-          ai: { state: 'completed', attempt: 1 },
-          similarity: { state: 'completed', attempt: 1 },
+          ai: { state: isDemoUser ? 'demo_locked' : 'completed', attempt: 1 },
+          similarity: { state: isDemoUser ? 'demo_locked' : 'completed', attempt: 1 },
         },
         sources: [
           { source: 'repositorio.pucp.edu.pe (Repositorio Institucional)', percent: '4%' },
@@ -414,7 +427,9 @@ export default function App() {
           id: `aud-${Date.now()}`,
           actorName: user.name,
           actorRole: viewMode,
-          action: `Envió documento #${nextCode} (${kinds.join(' + ').toUpperCase()})`,
+          action: isDemoUser
+            ? `Subió documento de prueba #${nextCode} en MODO DEMO (resultado protegido)`
+            : `Envió documento #${nextCode} (${kinds.join(' + ').toUpperCase()})`,
           target: chosenName,
           createdAt: new Date().toISOString(),
         },
@@ -424,14 +439,27 @@ export default function App() {
       setUploadStage(0);
       setUploadProgress(0);
       setUploadFileName('');
-      showNotification(
-        `¡Reporte #${nextCode} listo! Similitud: ${simScore}% · Detección IA: ${aiScore}%`
-      );
-      setSelectedJobForReport(newJob);
+
+      if (isDemoUser) {
+        showNotification(
+          `🔒 Documento #${nextCode} recibido en MODO DEMO: el resultado está protegido y oculto hasta adquirir una cuenta oficial.`
+        );
+      } else {
+        showNotification(
+          `¡Reporte #${nextCode} listo! Similitud: ${simScore}% · Detección IA: ${aiScore}%`
+        );
+        setSelectedJobForReport(newJob);
+      }
     }, 950);
   };
 
   const handleDownloadCertificate = (job, type = 'similarity') => {
+    if (user?.isDemo || job.isDemoFile || job.state === 'demo_locked') {
+      showNotification(
+        '🔒 Modo Demo: la descarga de certificados e informes está inhabilitada. Adquiere una cuenta oficial para descargar.'
+      );
+      return;
+    }
     const content = [
       '====================================================================',
       '          TURNITINPE · REPORTE OFICIAL DE IA Y SIMILITUD            ',
@@ -505,7 +533,7 @@ export default function App() {
       passwordPlain: password,
       role: 'admin',
       adminRole: 'report_admin',
-      adminRoleLabel: 'ADMIN REPORTES (SOLO SUS VENTAS)',
+      adminRoleLabel: 'ADMIN REPORTES',
       reviewAccess: 'instructor',
       status: 'active',
       deviceLimit: Math.min(Number(newAdminForm.deviceLimit) || 2, 5),
@@ -530,6 +558,91 @@ export default function App() {
     setUsers((prev) => [created, ...prev]);
     setShowNewAdminModal(false);
     showNotification(`Admin Reportes creado: ${name} (${email})`);
+  };
+
+  const openNewDemoModal = () => {
+    setDemoFormError('');
+    setDemoForm({
+      name: '',
+      email: '',
+      password: '',
+      expiresAt: toDateTimeLocalValue(new Date(Date.now() + 7 * 86400000)),
+      notes: 'Demo solo visualización (sin descarga ni edición)',
+    });
+    setShowDemoModal(true);
+  };
+
+  const handleCreateDemo = (e) => {
+    e.preventDefault();
+    const name = demoForm.name.trim();
+    const email = demoForm.email.trim().toLowerCase();
+    const password = demoForm.password.trim();
+
+    if (!name || !email) {
+      setDemoFormError('Ingresa el nombre del cliente y su correo.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setDemoFormError('El correo ingresado no es válido.');
+      return;
+    }
+    if (password && password.length < 6) {
+      setDemoFormError('La contraseña demo debe tener al menos 6 caracteres.');
+      return;
+    }
+    if (users.some((u) => (u.email || '').toLowerCase() === email)) {
+      setDemoFormError('Ya existe una cuenta registrada con este correo.');
+      return;
+    }
+
+    const parsedExpiry = demoForm.expiresAt
+      ? new Date(demoForm.expiresAt)
+      : new Date(Date.now() + 7 * 86400000);
+    const isoExpiry = Number.isNaN(parsedExpiry.getTime())
+      ? new Date(Date.now() + 7 * 86400000).toISOString()
+      : parsedExpiry.toISOString();
+
+    const createdDemo = {
+      id: `usr-demo-${Date.now().toString(36)}`,
+      name: `${name} (DEMO)`,
+      email,
+      passwordPlain: password || 'Demo#2026',
+      role: 'member',
+      accountType: 'instructor',
+      isDemo: true, // Flag fundamental para bloquear edición, subidas y visualización de resultados reales
+      status: 'active',
+      planId: 'plan-demo-visualizacion',
+      planName: 'DEMO SOLO VISUALIZACIÓN',
+      deviceLimit: 1,
+      deviceCount: 0,
+      originalityApproved: false,
+      expiresAt: isoExpiry,
+      lastLogin: null,
+      feedbackAccess: {
+        enabled: true,
+        mode: 'view_only',
+        reportKinds: ['similarity'],
+        canSubmit: false, // NO PUEDE ENVIAR ARCHIVOS
+      },
+      daily: {
+        configuredLimit: 0,
+        limit: 0,
+        unlimited: false,
+        reserved: 0,
+        consumed: 0,
+        remaining: 0,
+      },
+      sellerEmail: user?.email || 'fabianrayasaravia@gmail.com',
+      sellerName: user?.name || 'Soluciones Académicas',
+      createdByAdminId: user?.id,
+      notes: demoForm.notes || 'Cuenta demo para explorar la plataforma (solo visualización)',
+    };
+
+    setUsers((prev) => [createdDemo, ...prev]);
+    setShowDemoModal(false);
+    showNotification(
+      `Cuenta DEMO creada para ${name} · Clave: ${createdDemo.passwordPlain} (Solo visualización)`
+    );
   };
 
   const handleCreateUser = (e) => {
@@ -655,6 +768,12 @@ export default function App() {
   };
 
   const handleSendChat = (promptText) => {
+    if (user?.isDemo) {
+      showNotification(
+        '🔒 Modo Demo: el chat interactivo de Todas las IA está bloqueado. Es solo para visualización del catálogo.'
+      );
+      return;
+    }
     const content = (promptText ?? chatInput).trim();
     if (!content) return;
     const activeModelObj =
@@ -669,6 +788,12 @@ export default function App() {
   };
 
   const handleQuillbotParaphrase = (mode) => {
+    if (user?.isDemo) {
+      showNotification(
+        '🔒 Modo Demo: el motor de parafraseo de QuillBot está inactivo para cuentas demo (solo lectura).'
+      );
+      return;
+    }
     setQbMode(mode);
     const variants = {
       academic:
@@ -691,12 +816,14 @@ export default function App() {
   const isSuperAdmin = isAdminView && user?.adminRole === 'super_admin';
   const isReportAdmin = isAdminView && user?.adminRole === 'report_admin';
 
-  // Admin Reportes (report_admin) solo ve las cuentas que él mismo vende/crea
+  // Admin Reportes (report_admin) solo ve las cuentas oficiales que él mismo vende/crea
+  // Las cuentas DEMO quedan aisladas en su propia sección para que los admin de reportes NO se confundan
   const visibleUsers = useMemo(() => {
     if (isReportAdmin) {
       return users.filter(
         (u) =>
           u.role !== 'admin' &&
+          !u.isDemo && // Se ocultan cuentas demo a los vendedores
           ((u.sellerEmail || '').toLowerCase() === (user?.email || '').toLowerCase() ||
             u.createdByAdminId === user?.id ||
             u.createdById === user?.id)
@@ -726,6 +853,8 @@ export default function App() {
       if (userFilter === 'expired' && u.status !== 'expired') return false;
       if (userFilter === 'pending_reports' && !hasPendingReports(u)) return false;
       if (userFilter === 'suspended' && u.status !== 'suspended') return false;
+      if (userFilter === 'demos' && !u.isDemo) return false;
+      if (userFilter !== 'demos' && userFilter !== 'all' && u.isDemo) return false; // Las demos no ensucian activos/vencidos ordinarios
       const q = userSearch.trim().toLowerCase();
       if (!q) return true;
       return (
@@ -863,7 +992,7 @@ export default function App() {
                   <strong>3. Admin Reportes — {SEED_REPORT_ADMIN_USER.email} / {SEED_REPORT_ADMIN_USER.passwordPlain}</strong>
                   <span>Solo crea y ve las cuentas que él vende · No puede eliminar cuentas</span>
                 </button>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
                   <button
                     type="button"
                     className="demo-btn"
@@ -875,7 +1004,7 @@ export default function App() {
                       showNotification(`Vista Instructor (Asesor): ${client.name}`);
                     }}
                   >
-                    <strong>Cliente Instructor</strong>
+                    <strong>Instructor</strong>
                     <span>Similitud + IA</span>
                   </button>
                   <button
@@ -889,8 +1018,40 @@ export default function App() {
                       showNotification(`Vista Estudiante: ${stud.name}`);
                     }}
                   >
-                    <strong>Cliente Estudiante</strong>
+                    <strong>Estudiante</strong>
                     <span>Solo Similitud</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="demo-btn"
+                    style={{
+                      borderColor: 'rgba(217, 119, 6, 0.45)',
+                      background: 'rgba(217, 119, 6, 0.08)',
+                    }}
+                    onClick={() => {
+                      const demoUser = {
+                        id: 'usr-demo-invitado',
+                        name: 'Cliente Invitado (DEMO)',
+                        email: 'demo@turnitinpe.com',
+                        passwordPlain: 'Demo#2026',
+                        role: 'member',
+                        accountType: 'instructor',
+                        isDemo: true,
+                        status: 'active',
+                        planName: 'DEMO SOLO VISUALIZACIÓN',
+                        deviceLimit: 1,
+                        deviceCount: 0,
+                        feedbackAccess: { enabled: true, mode: 'view_only', reportKinds: ['similarity'], canSubmit: false },
+                        daily: { limit: 0, remaining: 0 },
+                      };
+                      setUser(demoUser);
+                      setViewMode('member');
+                      setActiveTab('overview');
+                      showNotification('🔒 Iniciada sesión como Cliente Demo (Solo visualización)');
+                    }}
+                  >
+                    <strong style={{ color: 'var(--amber)' }}>Cliente Demo</strong>
+                    <span>Solo Visualización</span>
                   </button>
                 </div>
               </div>
@@ -1283,7 +1444,7 @@ export default function App() {
                       ? 'ULTRA ADMIN (Elimina cuentas)'
                       : isSuperAdmin
                       ? 'SUPER ADMIN (Gestión general)'
-                      : 'ADMIN REPORTES (Solo sus ventas)'
+                      : 'ADMIN REPORTES'
                     : user.planName || 'INSTRUCTOR BÁSICO (7 / DÍA)'}
                 </small>
               </span>
@@ -1455,13 +1616,28 @@ export default function App() {
                 </>
               )}
               {activeTab === 'users' && (isUltraAdmin || isSuperAdmin) && (
-                <button
-                  type="button"
-                  className="button button-secondary"
-                  onClick={openNewAdminModal}
-                >
-                  <ShieldCheck size={16} /> Crear Admin Reportes
-                </button>
+                <>
+                  <button
+                    type="button"
+                    className="button button-secondary"
+                    onClick={openNewAdminModal}
+                  >
+                    <ShieldCheck size={16} /> Crear Admin Reportes
+                  </button>
+                  <button
+                    type="button"
+                    className="button button-secondary"
+                    style={{
+                      borderColor: 'rgba(217, 119, 6, 0.45)',
+                      color: 'var(--amber)',
+                      background: 'rgba(217, 119, 6, 0.08)',
+                    }}
+                    onClick={openNewDemoModal}
+                    title="Crear cuenta demo de solo visualización para clientes interesados"
+                  >
+                    <Sparkles size={16} /> Crear Demo
+                  </button>
+                </>
               )}
               {activeTab === 'users' && (
                 <button
@@ -1497,6 +1673,31 @@ export default function App() {
              ========================================== */}
           {activeTab === 'overview' && (
             <>
+              {user?.isDemo && (
+                <div
+                  style={{
+                    padding: '12px 16px',
+                    borderRadius: 12,
+                    marginBottom: 16,
+                    background: 'rgba(217, 119, 6, 0.12)',
+                    border: '1px solid rgba(217, 119, 6, 0.45)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                  }}
+                >
+                  <Sparkles size={24} style={{ color: 'var(--amber)', flexShrink: 0 }} />
+                  <div style={{ flex: 1 }}>
+                    <strong style={{ color: 'var(--amber)', fontSize: 13.5 }}>
+                      MODO DEMO ACTIVO (SOLO VISUALIZACIÓN)
+                    </strong>
+                    <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-secondary)' }}>
+                      Esta cuenta demo te permite explorar toda la interfaz, menús y funciones de la plataforma. Para mantener la confidencialidad, no es posible redactar, descargar informes ni consultar porcentajes reales de documentos subidos. Contacta a tu asesor para activar tu cuenta oficial.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Executive Hero Banner */}
               <section className="executive-hero-banner">
                 <div>
@@ -1662,21 +1863,31 @@ export default function App() {
                                 </div>
                               </td>
                               <td>
-                                <span
-                                  className={`status-pill ${
-                                    job.similarityScore <= 15
-                                      ? 'status-emerald'
-                                      : job.similarityScore <= 22
-                                      ? 'status-amber'
-                                      : 'status-crimson'
-                                  }`}
-                                >
-                                  {job.similarityScore}% Similitud
-                                </span>
+                                {job.isDemoFile || job.state === 'demo_locked' ? (
+                                  <span className="status-pill status-amber">
+                                    🔒 Similitud Protegida
+                                  </span>
+                                ) : (
+                                  <span
+                                    className={`status-pill ${
+                                      job.similarityScore <= 15
+                                        ? 'status-emerald'
+                                        : job.similarityScore <= 22
+                                        ? 'status-amber'
+                                        : 'status-crimson'
+                                    }`}
+                                  >
+                                    {job.similarityScore}% Similitud
+                                  </span>
+                                )}
                               </td>
                               {!isStudentAccount && (
                                 <td>
-                                  {aiFailed ? (
+                                  {job.isDemoFile || job.state === 'demo_locked' ? (
+                                    <span className="status-pill status-amber">
+                                      🔒 IA Protegida
+                                    </span>
+                                  ) : aiFailed ? (
                                     <button
                                       type="button"
                                       className="status-pill status-crimson"
@@ -1700,7 +1911,14 @@ export default function App() {
                                 <button
                                   type="button"
                                   className="button button-secondary button-sm"
-                                  onClick={() => setSelectedJobForReport(job)}
+                                  onClick={() => {
+                                    if (user?.isDemo || job.isDemoFile || job.state === 'demo_locked') {
+                                      showNotification(
+                                        '🔒 Modo Demo: el detalle completo del informe está protegido. Solo se muestra la estructura visual.'
+                                      );
+                                    }
+                                    setSelectedJobForReport(job);
+                                  }}
                                 >
                                   <Eye size={13} /> Ver Reporte
                                 </button>
@@ -2200,64 +2418,87 @@ export default function App() {
                               </div>
                             </td>
                             <td>
-                              {/* Stacked outcomes: Student accounts only see Similarity */}
-                              <div className="bs-outcomes-stack">
-                                <div className="bs-outcome-item bs-outcome-ok">
-                                  <span className="status-pill status-emerald">
-                                    <CheckCircle2 size={12} /> Similitud listo ({job.similarityScore}
-                                    %)
-                                  </span>
-                                  <button
-                                    type="button"
-                                    className="button button-secondary button-sm"
-                                    onClick={() => handleDownloadCertificate(job, 'similarity')}
+                              {/* Stacked outcomes: cuentas Demo o archivos demo tienen resultados protegidos (sin ver score) */}
+                              {job.isDemoFile || job.state === 'demo_locked' ? (
+                                <div className="bs-outcomes-stack">
+                                  <div
+                                    className="bs-outcome-item"
+                                    style={{
+                                      background: 'rgba(217, 119, 6, 0.08)',
+                                      borderColor: 'rgba(217, 119, 6, 0.35)',
+                                      padding: '8px 10px',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: 4,
+                                    }}
                                   >
-                                    <Download size={13} /> Descargar Similitud
-                                  </button>
+                                    <span className="status-pill status-amber" style={{ width: 'fit-content' }}>
+                                      🔒 Modo Demo · Resultado Protegido
+                                    </span>
+                                    <small style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                                      El documento fue procesado pero el porcentaje y el PDF están ocultos en esta cuenta demo de visualización.
+                                    </small>
+                                  </div>
                                 </div>
+                              ) : (
+                                <div className="bs-outcomes-stack">
+                                  <div className="bs-outcome-item bs-outcome-ok">
+                                    <span className="status-pill status-emerald">
+                                      <CheckCircle2 size={12} /> Similitud listo ({job.similarityScore}
+                                      %)
+                                    </span>
+                                    <button
+                                      type="button"
+                                      className="button button-secondary button-sm"
+                                      onClick={() => handleDownloadCertificate(job, 'similarity')}
+                                    >
+                                      <Download size={13} /> Descargar Similitud
+                                    </button>
+                                  </div>
 
-                                {!isStudentAccount &&
-                                  (aiFailed ? (
-                                    <div className="bs-outcome-item bs-outcome-err">
-                                      <div>
-                                        <span className="status-pill status-crimson">
-                                          Error en IA
-                                        </span>
-                                        <small
-                                          style={{
-                                            display: 'block',
-                                            fontSize: 11,
-                                            color: 'var(--text-secondary)',
-                                            marginTop: 2,
-                                          }}
+                                  {!isStudentAccount &&
+                                    (aiFailed ? (
+                                      <div className="bs-outcome-item bs-outcome-err">
+                                        <div>
+                                          <span className="status-pill status-crimson">
+                                            Error en IA
+                                          </span>
+                                          <small
+                                            style={{
+                                              display: 'block',
+                                              fontSize: 11,
+                                              color: 'var(--text-secondary)',
+                                              marginTop: 2,
+                                            }}
+                                          >
+                                            No se pudo generar este informe. Los demás informes
+                                            conservan su estado.
+                                          </small>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          className="button button-emerald button-sm"
+                                          onClick={() => handleRetryAiReport(job.id)}
                                         >
-                                          No se pudo generar este informe. Los demás informes
-                                          conservan su estado.
-                                        </small>
+                                          <RefreshCw size={13} /> Reintentar IA
+                                        </button>
                                       </div>
-                                      <button
-                                        type="button"
-                                        className="button button-emerald button-sm"
-                                        onClick={() => handleRetryAiReport(job.id)}
-                                      >
-                                        <RefreshCw size={13} /> Reintentar IA
-                                      </button>
-                                    </div>
-                                  ) : (
-                                    <div className="bs-outcome-item bs-outcome-ok">
-                                      <span className="status-pill status-blue">
-                                        <CheckCircle2 size={12} /> IA listo ({job.aiScore}%)
-                                      </span>
-                                      <button
-                                        type="button"
-                                        className="button button-secondary button-sm"
-                                        onClick={() => handleDownloadCertificate(job, 'ai')}
-                                      >
-                                        <Download size={13} /> Descargar IA
-                                      </button>
-                                    </div>
-                                  ))}
-                              </div>
+                                    ) : (
+                                      <div className="bs-outcome-item bs-outcome-ok">
+                                        <span className="status-pill status-blue">
+                                          <CheckCircle2 size={12} /> IA listo ({job.aiScore}%)
+                                        </span>
+                                        <button
+                                          type="button"
+                                          className="button button-secondary button-sm"
+                                          onClick={() => handleDownloadCertificate(job, 'ai')}
+                                        >
+                                          <Download size={13} /> Descargar IA
+                                        </button>
+                                      </div>
+                                    ))}
+                                </div>
+                              )}
                             </td>
                             <td>
                               <div style={{ display: 'flex', gap: 6 }}>
@@ -2398,10 +2639,25 @@ export default function App() {
                   <textarea
                     rows={2}
                     value={chatInput}
+                    disabled={!!user?.isDemo}
                     onChange={(e) => setChatInput(e.target.value)}
-                    placeholder="Pega aquí el fragmento que deseas reformular antes de volver a pasar por Turnitin…"
+                    placeholder={
+                      user?.isDemo
+                        ? '🔒 Modo Demo (solo visualización): no es posible redactar ni enviar consultas en el laboratorio IA.'
+                        : 'Pega aquí el fragmento que deseas reformular antes de volver a pasar por Turnitin…'
+                    }
+                    style={
+                      user?.isDemo
+                        ? { background: 'var(--bg-card)', cursor: 'not-allowed', opacity: 0.75 }
+                        : {}
+                    }
                   />
-                  <button type="submit" className="button button-primary">
+                  <button
+                    type="submit"
+                    className="button button-primary"
+                    disabled={!!user?.isDemo}
+                    title={user?.isDemo ? 'Inhabilitado en cuenta demo' : 'Enviar consulta'}
+                  >
                     <Send size={15} /> Enviar
                   </button>
                 </form>
@@ -2447,8 +2703,18 @@ export default function App() {
                     Fragmento con coincidencias
                     <textarea
                       rows={6}
-                      value={qbInput}
+                      value={
+                        user?.isDemo
+                          ? '🔒 [Modo Demo - Solo Lectura]\nEste texto es un ejemplo precargado. En una cuenta oficial podrás pegar cualquier fragmento para parafrasearlo al instante.'
+                          : qbInput
+                      }
+                      disabled={!!user?.isDemo}
                       onChange={(e) => setQbInput(e.target.value)}
+                      style={
+                        user?.isDemo
+                          ? { background: 'var(--bg-card)', cursor: 'not-allowed', opacity: 0.8 }
+                          : {}
+                      }
                     />
                   </label>
                   <label className="field">
@@ -2671,6 +2937,12 @@ export default function App() {
                                 visibleUsers.filter((u) => u.role === 'admin').length
                               })`,
                             },
+                            {
+                              id: 'demos',
+                              label: `Demos (${
+                                visibleUsers.filter((u) => u.isDemo).length
+                              })`,
+                            },
                           ]
                         : []),
                     ].map((tab) => (
@@ -2696,13 +2968,28 @@ export default function App() {
                       />
                     </div>
                     {(isUltraAdmin || isSuperAdmin) && (
-                      <button
-                        type="button"
-                        className="button button-secondary button-sm"
-                        onClick={openNewAdminModal}
-                      >
-                        <ShieldCheck size={14} /> Crear Admin Reportes
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          className="button button-secondary button-sm"
+                          onClick={openNewAdminModal}
+                        >
+                          <ShieldCheck size={14} /> Crear Admin Reportes
+                        </button>
+                        <button
+                          type="button"
+                          className="button button-secondary button-sm"
+                          style={{
+                            borderColor: 'rgba(217, 119, 6, 0.45)',
+                            color: 'var(--amber)',
+                            background: 'rgba(217, 119, 6, 0.08)',
+                          }}
+                          onClick={openNewDemoModal}
+                          title="Crear cuenta demo para clientes interesados (solo visualización)"
+                        >
+                          <Sparkles size={14} /> Crear Demo
+                        </button>
+                      </>
                     )}
                     <button
                       type="button"
@@ -2754,12 +3041,21 @@ export default function App() {
                             </td>
                             <td>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                <span className="code-chip" style={{ width: 'fit-content' }}>
-                                  {u.role === 'admin'
+                                <span
+                                  className={`code-chip ${u.isDemo ? 'status-amber' : ''}`}
+                                  style={{ width: 'fit-content', fontWeight: u.isDemo ? 700 : 'normal' }}
+                                >
+                                  {u.isDemo
+                                    ? '🔒 DEMO SOLO VISUALIZACIÓN'
+                                    : u.role === 'admin'
                                     ? u.adminRoleLabel || 'ADMINISTRADOR'
                                     : u.planName || 'INSTRUCTOR BÁSICO'}
                                 </span>
-                                {u.role !== 'admin' && (
+                                {u.isDemo ? (
+                                  <small style={{ fontSize: 11, fontWeight: 700, color: 'var(--amber)' }}>
+                                    Solo lectura · Resultados protegidos
+                                  </small>
+                                ) : u.role !== 'admin' && (
                                   <small
                                     style={{
                                       fontSize: 11,
@@ -3621,6 +3917,137 @@ export default function App() {
                 </button>
                 <button type="submit" className="button button-primary">
                   <ShieldCheck size={16} /> Crear Admin Reportes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Independiente: Crear Demo (Solo Ultra Admin y Super Admin) */}
+      {showDemoModal && (isUltraAdmin || isSuperAdmin) && (
+        <div className="modal-backdrop" onClick={() => setShowDemoModal(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <span className="page-eyebrow" style={{ color: 'var(--amber)' }}>
+                  ACCESO DEMO · SOLO VISUALIZACIÓN
+                </span>
+                <h2 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Sparkles size={20} style={{ color: 'var(--amber)' }} />
+                  Crear Demo
+                </h2>
+              </div>
+              <button className="icon-btn" onClick={() => setShowDemoModal(false)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <form
+              onSubmit={handleCreateDemo}
+              style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
+            >
+              {demoFormError && (
+                <div className="error-banner" role="alert">
+                  {demoFormError}
+                </div>
+              )}
+
+              <div
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: 10,
+                  background: 'rgba(217, 119, 6, 0.1)',
+                  border: '1px solid rgba(217, 119, 6, 0.35)',
+                  fontSize: 12.5,
+                  color: 'var(--text-secondary)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 4,
+                }}
+              >
+                <strong style={{ color: 'var(--amber)' }}>
+                  🔒 Restricciones estrictas para el cliente demo:
+                </strong>
+                <span>• Puede navegar por toda la plataforma pero <strong>no podrá usarla para generar informes</strong>.</span>
+                <span>• Si sube un archivo de prueba, <strong>no podrá ver el resultado ni los porcentajes</strong> (quedan protegidos).</span>
+                <span>• No podrá escribir ni parafrasear en QuillBot ni en Todas las IA (solo lectura).</span>
+                <span>• Queda en su propia sección "Demos" para que los <strong>Admin Reportes no se confundan</strong>.</span>
+              </div>
+
+              <label className="field">
+                Nombre del cliente interesado
+                <input
+                  type="text"
+                  required
+                  maxLength={100}
+                  value={demoForm.name}
+                  onChange={(e) => setDemoForm({ ...demoForm, name: e.target.value })}
+                  placeholder="Ej. Dr. Mario Vargas (Demo)"
+                />
+              </label>
+
+              <label className="field">
+                Correo para la demo
+                <input
+                  type="email"
+                  required
+                  value={demoForm.email}
+                  onChange={(e) => setDemoForm({ ...demoForm, email: e.target.value })}
+                  placeholder="cliente.demo@correo.com"
+                />
+              </label>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <label className="field">
+                  Contraseña de acceso
+                  <input
+                    type="text"
+                    value={demoForm.password}
+                    onChange={(e) => setDemoForm({ ...demoForm, password: e.target.value })}
+                    placeholder="Demo#2026 (por defecto)"
+                  />
+                </label>
+
+                <label className="field">
+                  Vigencia de la demo
+                  <input
+                    type="datetime-local"
+                    value={demoForm.expiresAt}
+                    onChange={(e) => setDemoForm({ ...demoForm, expiresAt: e.target.value })}
+                  />
+                </label>
+              </div>
+
+              <label className="field">
+                Notas / Motivo de la demo
+                <input
+                  type="text"
+                  value={demoForm.notes}
+                  onChange={(e) => setDemoForm({ ...demoForm, notes: e.target.value })}
+                  placeholder="Ej. Cliente consultando por plan Instructor Ilimitado"
+                />
+              </label>
+
+              <div className="modal-actions" style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 6 }}>
+                <button
+                  type="button"
+                  className="button button-secondary"
+                  onClick={() => setShowDemoModal(false)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="button button-primary"
+                  style={{
+                    background: 'var(--amber)',
+                    borderColor: 'var(--amber)',
+                    color: '#000',
+                    fontWeight: 700,
+                  }}
+                >
+                  <Sparkles size={16} /> Crear Demo
                 </button>
               </div>
             </form>
