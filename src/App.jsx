@@ -34,6 +34,7 @@ import {
   Trash2,
   Calendar,
   Clock,
+  Globe,
 } from 'lucide-react';
 import {
   SEED_ADMIN_USER,
@@ -874,11 +875,45 @@ export default function App() {
     });
   }, [visibleUsers, userFilter, userSearch]);
 
-  // Inicio público
-  if (!user && showLanding) {
+  // Inicio público (Landing page institucional)
+  if (showLanding) {
     return (
       <Landing
+        currentUser={user}
         onLogin={() => {
+          setShowLanding(false);
+          window.scrollTo(0, 0);
+        }}
+        onTryDemo={() => {
+          const demoAccount = {
+            id: 'demo-public-visitor',
+            name: 'Cliente Demo (Prospecto)',
+            email: 'demo@turnitinpe.com',
+            passwordPlain: 'Demo#2026',
+            role: 'member',
+            accountType: 'instructor',
+            isDemo: true,
+            status: 'active',
+            planName: 'DEMO SOLO VISUALIZACIÓN',
+            deviceLimit: 1,
+            deviceCount: 0,
+            daily: { limit: 2, used: 0, remaining: 2, reserved: 0 },
+            feedbackAccess: {
+              enabled: true,
+              mode: 'view_only',
+              reportKinds: ['similarity', 'ai'],
+              canSubmit: false,
+            },
+          };
+          setUser(demoAccount);
+          setViewMode('member');
+          setShowLanding(false);
+          window.scrollTo(0, 0);
+          showNotification(
+            '¡Bienvenido al Modo Demo de TurnitinPE! Puedes explorar la interfaz y el visor de informes.'
+          );
+        }}
+        onReturnToPlatform={() => {
           setShowLanding(false);
           window.scrollTo(0, 0);
         }}
@@ -1553,6 +1588,17 @@ export default function App() {
               onClick={() => setActiveTab('turnitin2')}
             >
               <Upload size={14} /> Subir Documento PDF
+            </button>
+            <button
+              type="button"
+              className="button button-secondary button-sm"
+              onClick={() => {
+                setShowLanding(true);
+                window.scrollTo(0, 0);
+              }}
+              title="Ver la página de inicio institucional"
+            >
+              <Globe size={14} /> Ver Sitio Web
             </button>
           </div>
         </header>
