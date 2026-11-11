@@ -50,6 +50,7 @@ import {
   SEED_AUDIT,
 } from './data/liveSeedData';
 import ReportViewerModal from './components/ReportViewerModal';
+import Landing from './components/Landing';
 
 function formatCurrency(minor, currency = 'PEN') {
   return new Intl.NumberFormat('es-PE', {
@@ -172,7 +173,14 @@ function QuillbotIcon({ size = 18 }) {
 
 export default function App() {
   const [theme, setTheme] = useState('light');
-  const [user, setUser] = useState(SEED_ADMIN_USER);
+  const [user, setUser] = useState(null);
+  // Inicio público (landing). Subdominios app./login./portal. o #login van directo al inicio de sesión.
+  const [showLanding, setShowLanding] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    const host = window.location.hostname;
+    const direct = /^(app|login|portal|panel)\./i.test(host) || /login/i.test(window.location.hash);
+    return !direct;
+  });
   const [viewMode, setViewMode] = useState('admin'); // 'admin' | 'member'
   const [activeTab, setActiveTab] = useState('overview');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -866,6 +874,18 @@ export default function App() {
     });
   }, [visibleUsers, userFilter, userSearch]);
 
+  // Inicio público
+  if (!user && showLanding) {
+    return (
+      <Landing
+        onLogin={() => {
+          setShowLanding(false);
+          window.scrollTo(0, 0);
+        }}
+      />
+    );
+  }
+
   // Login Screen
   if (!user) {
     return (
@@ -876,9 +896,18 @@ export default function App() {
               <TurnitinSymbol />
               <span>turnitinpe</span>
             </div>
-            <button className="sidebar-icon-btn" onClick={toggleTheme} title="Cambiar tema">
-              {theme === 'light' ? <Moon size={17} /> : <Sun size={17} />}
-            </button>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <button
+                type="button"
+                className="button button-secondary button-sm"
+                onClick={() => setShowLanding(true)}
+              >
+                ← Volver al inicio
+              </button>
+              <button className="sidebar-icon-btn" onClick={toggleTheme} title="Cambiar tema">
+                {theme === 'light' ? <Moon size={17} /> : <Sun size={17} />}
+              </button>
+            </div>
           </div>
 
           <div className="auth-story-body">
