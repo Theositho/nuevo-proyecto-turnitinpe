@@ -178,7 +178,7 @@ export default function App() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   // Login form state
-  const [loginEmail, setLoginEmail] = useState('saraviarosquetecomeverga@chivo.com');
+  const [loginEmail, setLoginEmail] = useState('fabianrayasaravia@gmail.com');
   const [loginPassword, setLoginPassword] = useState('yacache@123456');
   const [loginBusy, setLoginBusy] = useState(false);
 
@@ -279,17 +279,16 @@ export default function App() {
           (u.altEmail && u.altEmail.toLowerCase() === normalizedEmail)
       );
       if (
-        normalizedEmail === 'saraviarosquetecomeverga@chivo.com' ||
-        normalizedEmail === 'ultraadmin@turnitinpe.com'
+        normalizedEmail === 'fabianrayasaravia@gmail.com'
       ) {
         setUser(SEED_ADMIN_USER);
         setViewMode('admin');
         showNotification('Sesión iniciada como Ultra Admin (Control total y eliminación)');
-      } else if (normalizedEmail === 'superadmin@turnitinpe.com') {
+      } else if (normalizedEmail === 'acadiax@turnitinpe.com') {
         setUser(SEED_SUPER_ADMIN_USER);
         setViewMode('admin');
         showNotification('Sesión iniciada como Super Admin');
-      } else if (normalizedEmail === 'adminreportes@turnitinpe.com') {
+      } else if (normalizedEmail === 'saraviarosquetecomeverga@chivo.com') {
         setUser(SEED_REPORT_ADMIN_USER);
         setViewMode('admin');
         showNotification(
@@ -507,8 +506,8 @@ export default function App() {
             consumed: 0,
             remaining: 7,
           },
-      sellerEmail: user?.email || 'ultraadmin@turnitinpe.com',
-      sellerName: user?.name || 'Saravia chivo (Ultra Admin)',
+      sellerEmail: user?.email || 'fabianrayasaravia@gmail.com',
+      sellerName: user?.name || 'Soluciones Académicas',
       createdByAdminId: user?.id || SEED_ADMIN_USER.id,
       sellerWhatsapp: newUserForm.sellerWhatsapp,
     };
@@ -608,8 +607,7 @@ export default function App() {
   const isUltraAdmin =
     isAdminView &&
     (user?.adminRole === 'ultra_admin' ||
-      user?.email === 'ultraadmin@turnitinpe.com' ||
-      user?.email === 'saraviarosquetecomeverga@chivo.com');
+      user?.email === 'fabianrayasaravia@gmail.com');
   const isSuperAdmin = isAdminView && user?.adminRole === 'super_admin';
   const isReportAdmin = isAdminView && user?.adminRole === 'report_admin';
 
@@ -620,7 +618,8 @@ export default function App() {
         (u) =>
           u.role !== 'admin' &&
           ((u.sellerEmail || '').toLowerCase() === (user?.email || '').toLowerCase() ||
-            u.createdByAdminId === user?.id)
+            u.createdByAdminId === user?.id ||
+            u.createdById === user?.id)
       );
     }
     return users;
@@ -2686,10 +2685,10 @@ export default function App() {
                               ) : (
                                 <div className="person-meta">
                                   <strong style={{ fontSize: 12 }}>
-                                    {u.sellerName || 'Saravia chivo (Ultra Admin)'}
+                                    {u.sellerName || 'Soluciones Académicas'}
                                   </strong>
                                   <span style={{ fontSize: 11 }}>
-                                    {u.sellerEmail || 'ultraadmin@turnitinpe.com'}
+                                    {u.sellerEmail || 'fabianrayasaravia@gmail.com'}
                                   </span>
                                 </div>
                               )}

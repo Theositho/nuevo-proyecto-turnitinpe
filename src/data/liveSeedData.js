@@ -1,8 +1,7 @@
 export const SEED_ADMIN_USER = {
-  id: 'b05cf75e-49dc-4f61-9207-65fc0933bade',
-  name: 'Saravia chivo (Ultra Admin)',
-  email: 'ultraadmin@turnitinpe.com',
-  altEmail: 'saraviarosquetecomeverga@chivo.com',
+  id: '6e5ecc58-98df-473f-9daa-242ecf83c00c',
+  name: 'Soluciones Académicas',
+  email: 'fabianrayasaravia@gmail.com',
   passwordPlain: 'UltraAdmin#2026',
   role: 'admin',
   adminRole: 'ultra_admin',
@@ -43,9 +42,10 @@ export const SEED_ADMIN_USER = {
 };
 
 export const SEED_SUPER_ADMIN_USER = {
-  id: 'adm-super-001',
-  name: 'Carlos Mendoza (Super Admin)',
-  email: 'superadmin@turnitinpe.com',
+  id: 'adm-super-acadiax',
+  name: 'Acadiax',
+  // Correo provisional: confirmar el correo real de la cuenta Acadiax en turnitinpe.com
+  email: 'acadiax@turnitinpe.com',
   passwordPlain: 'SuperAdmin#2026',
   role: 'admin',
   adminRole: 'super_admin',
@@ -80,10 +80,11 @@ export const SEED_SUPER_ADMIN_USER = {
 };
 
 export const SEED_REPORT_ADMIN_USER = {
-  id: 'adm-reportes-002',
-  name: 'Admin Reportes (Vendedor)',
-  email: 'adminreportes@turnitinpe.com',
-  passwordPlain: 'AdminReportes#2026',
+  id: 'b05cf75e-49dc-4f61-9207-65fc0933bade',
+  name: 'Saravia chivo (Vendedor)',
+  email: 'saraviarosquetecomeverga@chivo.com',
+  passwordPlain: 'Vendedor#2026',
+  createdById: '6e5ecc58-98df-473f-9daa-242ecf83c00c',
   role: 'admin',
   adminRole: 'report_admin',
   adminRoleLabel: 'ADMIN REPORTES (SOLO SUS VENTAS)',
@@ -521,8 +522,8 @@ export const SEED_USERS = [
     expiresAt: '2026-12-09T04:00:00.000Z',
     lastLogin: '2026-11-09T03:46:55.555Z',
     daily: { configuredLimit: 7, limit: 7, reserved: 0, consumed: 2, remaining: 5 },
-    sellerEmail: 'adminreportes@turnitinpe.com',
-    sellerName: 'Admin Reportes (Vendedor)',
+    sellerEmail: 'saraviarosquetecomeverga@chivo.com',
+    sellerName: 'Saravia chivo (Vendedor)',
     sellerWhatsapp: '+51987654321',
   },
   {
@@ -542,8 +543,8 @@ export const SEED_USERS = [
     expiresAt: '2026-12-02T04:00:00.000Z',
     lastLogin: '2026-11-09T03:17:13.002Z',
     daily: { configuredLimit: 7, limit: 7, reserved: 0, consumed: 1, remaining: 6 },
-    sellerEmail: 'ultraadmin@turnitinpe.com',
-    sellerName: 'Saravia chivo (Ultra Admin)',
+    sellerEmail: 'fabianrayasaravia@gmail.com',
+    sellerName: 'Soluciones Académicas',
     sellerWhatsapp: '+51987654321',
   },
   {
@@ -564,8 +565,8 @@ export const SEED_USERS = [
     expiresAt: '2026-11-28T04:00:00.000Z',
     lastLogin: '2026-11-09T02:53:53.339Z',
     daily: { configuredLimit: null, limit: null, unlimited: true, reserved: 0, consumed: 4, remaining: null },
-    sellerEmail: 'superadmin@turnitinpe.com',
-    sellerName: 'Carlos Mendoza (Super Admin)',
+    sellerEmail: 'acadiax@turnitinpe.com',
+    sellerName: 'Acadiax',
     sellerWhatsapp: '+51987654321',
   },
   {
@@ -586,8 +587,8 @@ export const SEED_USERS = [
     lastLogin: '2026-11-09T02:53:01.922Z',
     pendingReports: 1,
     daily: { configuredLimit: 7, limit: 7, reserved: 1, consumed: 3, remaining: 3 },
-    sellerEmail: 'ultraadmin@turnitinpe.com',
-    sellerName: 'Saravia chivo (Ultra Admin)',
+    sellerEmail: 'fabianrayasaravia@gmail.com',
+    sellerName: 'Soluciones Académicas',
     sellerWhatsapp: '+51987654321',
   },
   {
@@ -608,8 +609,8 @@ export const SEED_USERS = [
     lastLogin: '2026-10-23T22:28:39.204Z',
     pendingReports: 2,
     daily: { configuredLimit: 7, limit: 7, reserved: 2, consumed: 2, remaining: 3 },
-    sellerEmail: 'superadmin@turnitinpe.com',
-    sellerName: 'Carlos Mendoza (Super Admin)',
+    sellerEmail: 'acadiax@turnitinpe.com',
+    sellerName: 'Acadiax',
     sellerWhatsapp: '+51987654321',
   },
   {
@@ -629,8 +630,8 @@ export const SEED_USERS = [
     expiresAt: '2026-11-29T04:00:00.000Z',
     lastLogin: '2026-10-19T21:55:26.419Z',
     daily: { configuredLimit: 7, limit: 7, reserved: 0, consumed: 1, remaining: 6 },
-    sellerEmail: 'adminreportes@turnitinpe.com',
-    sellerName: 'Admin Reportes (Vendedor)',
+    sellerEmail: 'saraviarosquetecomeverga@chivo.com',
+    sellerName: 'Saravia chivo (Vendedor)',
     sellerWhatsapp: '+51987654321',
   },
   {
@@ -651,8 +652,8 @@ export const SEED_USERS = [
     expiresAt: '2026-11-25T04:00:00.000Z',
     lastLogin: '2026-10-24T02:05:31.964Z',
     daily: { configuredLimit: null, limit: null, unlimited: true, reserved: 0, consumed: 4, remaining: null },
-    sellerEmail: 'ultraadmin@turnitinpe.com',
-    sellerName: 'Saravia chivo (Ultra Admin)',
+    sellerEmail: 'fabianrayasaravia@gmail.com',
+    sellerName: 'Soluciones Académicas',
     sellerWhatsapp: '+51987654321',
   },
   {
@@ -672,8 +673,8 @@ export const SEED_USERS = [
     expiresAt: '2026-11-22T04:00:00.000Z',
     lastLogin: '2026-11-08T18:10:00.000Z',
     daily: { configuredLimit: 7, limit: 7, reserved: 0, consumed: 0, remaining: 7 },
-    sellerEmail: 'adminreportes@turnitinpe.com',
-    sellerName: 'Admin Reportes (Vendedor)',
+    sellerEmail: 'saraviarosquetecomeverga@chivo.com',
+    sellerName: 'Saravia chivo (Vendedor)',
     sellerWhatsapp: '+51987654321',
   },
   {
@@ -694,8 +695,8 @@ export const SEED_USERS = [
     expiresAt: '2026-11-30T04:00:00.000Z',
     lastLogin: '2026-11-08T16:40:00.000Z',
     daily: { configuredLimit: null, limit: null, unlimited: true, reserved: 0, consumed: 0, remaining: null },
-    sellerEmail: 'superadmin@turnitinpe.com',
-    sellerName: 'Carlos Mendoza (Super Admin)',
+    sellerEmail: 'acadiax@turnitinpe.com',
+    sellerName: 'Acadiax',
     sellerWhatsapp: '+51987654321',
   },
   {
@@ -715,8 +716,8 @@ export const SEED_USERS = [
     expiresAt: '2026-11-01T04:00:00.000Z',
     lastLogin: '2026-10-23T00:30:38.826Z',
     daily: { configuredLimit: 7, limit: 7, reserved: 0, consumed: 7, remaining: 0 },
-    sellerEmail: 'adminreportes@turnitinpe.com',
-    sellerName: 'Admin Reportes (Vendedor)',
+    sellerEmail: 'saraviarosquetecomeverga@chivo.com',
+    sellerName: 'Saravia chivo (Vendedor)',
     sellerWhatsapp: '+51987654321',
   },
   {
@@ -736,8 +737,8 @@ export const SEED_USERS = [
     expiresAt: '2026-10-28T04:00:00.000Z',
     lastLogin: '2026-10-15T02:12:29.438Z',
     daily: { configuredLimit: 7, limit: 7, reserved: 0, consumed: 0, remaining: 7 },
-    sellerEmail: 'ultraadmin@turnitinpe.com',
-    sellerName: 'Saravia chivo (Ultra Admin)',
+    sellerEmail: 'fabianrayasaravia@gmail.com',
+    sellerName: 'Soluciones Académicas',
     sellerWhatsapp: '+51987654321',
   },
 ];
