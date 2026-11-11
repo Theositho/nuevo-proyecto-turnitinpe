@@ -279,16 +279,6 @@ export default function Landing({ onLogin, onTryDemo, currentUser, onReturnToPla
                   <Eye size={16} /> Probar Demo en Vivo
                 </button>
               )}
-              <a
-                href={`${whatsappBase}${encodeURIComponent(
-                  'Hola TurnitinPE, deseo asesoría para revisar mi tesis/documento con Turnitin Sin Depósito.'
-                )}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="lp-btn lp-btn-whatsapp lp-btn-lg"
-              >
-                <MessageCircle size={16} /> Asesor WhatsApp
-              </a>
             </div>
           </div>
 
