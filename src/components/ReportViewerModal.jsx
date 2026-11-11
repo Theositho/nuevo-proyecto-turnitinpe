@@ -9,13 +9,14 @@ import {
   CheckCircle2,
   AlertTriangle,
   Cpu,
+  Lock,
 } from 'lucide-react';
 
-function ScoreRing({ value, colorVar, label, sublabel, isError = false }) {
+function ScoreRing({ value, colorVar, label, sublabel, isError = false, isLocked = false }) {
   const radius = 32;
   const circumference = 2 * Math.PI * radius;
-  const safeVal = isError ? 100 : Math.max(0, Math.min(100, Number(value) || 0));
-  const offset = circumference - (safeVal / 100) * circumference;
+  const safeVal = isError || isLocked ? 100 : Math.max(0, Math.min(100, Number(value) || 0));
+  const offset = isLocked ? 0 : circumference - (safeVal / 100) * circumference;
 
   return (
     <div className="report-score-card">
@@ -34,7 +35,7 @@ function ScoreRing({ value, colorVar, label, sublabel, isError = false }) {
             cy="40"
             r={radius}
             fill="none"
-            stroke={colorVar}
+            stroke={isLocked ? 'var(--amber)' : colorVar}
             strokeWidth="7"
             strokeLinecap="round"
             strokeDasharray={circumference}
@@ -44,12 +45,14 @@ function ScoreRing({ value, colorVar, label, sublabel, isError = false }) {
           />
         </svg>
         <div className="report-score-center">
-          <strong>{isError ? 'ERR' : `${safeVal}%`}</strong>
+          <strong>{isLocked ? '🔒' : isError ? 'ERR' : `${safeVal}%`}</strong>
         </div>
       </div>
       <div className="report-score-meta">
         <span className="report-score-eyebrow">{label}</span>
-        <strong className="report-score-title">{sublabel}</strong>
+        <strong className="report-score-title" style={isLocked ? { color: 'var(--amber)' } : {}}>
+          {isLocked ? 'Resultado Protegido' : sublabel}
+        </strong>
       </div>
     </div>
   );
@@ -65,7 +68,8 @@ export default function ReportViewerModal({
 
   if (!job) return null;
 
-  const aiFailed = job.reportStates?.ai?.state === 'failed';
+  const isDemo = !!(job.isDemoFile || job.state === 'demo_locked');
+  const aiFailed = !isDemo && job.reportStates?.ai?.state === 'failed';
   const simColorHex =
     job.similarityScore <= 15
       ? 'var(--emerald)'
@@ -91,10 +95,11 @@ export default function ReportViewerModal({
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <span className="page-eyebrow" style={{ marginBottom: 0 }}>
-                CÓDIGO {job.displayCode} · INFORME IA + SIMILITUD
+                CÓDIGO {job.displayCode} · {isDemo ? 'MODO DEMO (RESULTADOS PROTEGIDOS)' : 'INFORME IA + SIMILITUD'}
               </span>
-              <span className="status-pill status-emerald">
-                <ShieldCheck size={12} /> Servicio disponible
+              <span className={`status-pill ${isDemo ? 'status-amber' : 'status-emerald'}`}>
+                {isDemo ? <Lock size={12} /> : <ShieldCheck size={12} />}
+                {isDemo ? 'Cuenta Demo · Solo Visualización' : 'Servicio disponible'}
               </span>
             </div>
             <h2 style={{ marginTop: 6, fontSize: 19 }}>{job.name}</h2>
@@ -108,12 +113,36 @@ export default function ReportViewerModal({
           </button>
         </div>
 
+        {isDemo && (
+          <div
+            style={{
+              padding: '12px 16px',
+              borderRadius: 10,
+              background: 'rgba(245, 158, 11, 0.12)',
+              border: '1px solid rgba(245, 158, 11, 0.35)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              margin: '0 0 16px 0',
+            }}
+          >
+            <span style={{ fontSize: 20 }}>🔒</span>
+            <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>
+              <strong style={{ color: 'var(--amber)' }}>Modo Demo · Resultado Protegido</strong>
+              <p style={{ margin: '2px 0 0', color: 'var(--text-secondary)', fontSize: 12 }}>
+                Los porcentajes exactos de similitud y detección de IA, así como los informes oficiales PDF, están protegidos y ocultos en esta cuenta demo. Adquiere una cuenta oficial con tu asesor para desbloquear tus informes completos.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Radial Score Summary Grid */}
         <div className="report-summary-banner">
           <ScoreRing
             value={job.similarityScore}
             colorVar={simColorHex}
-            label={`SIMILITUD (${job.reportNames?.similarity || `sim-${job.displayCode}.pdf`})`}
+            isLocked={isDemo}
+            label={`SIMILITUD (${isDemo ? 'Protegido' : job.reportNames?.similarity || `sim-${job.displayCode}.pdf`})`}
             sublabel="Similitud listo"
           />
 
@@ -121,7 +150,8 @@ export default function ReportViewerModal({
             value={job.aiScore}
             colorVar={aiColorHex}
             isError={aiFailed}
-            label={`DETECCIÓN DE IA (${job.reportNames?.ai || `ai-${job.displayCode}.pdf`})`}
+            isLocked={isDemo}
+            label={`DETECCIÓN DE IA (${isDemo ? 'Protegido' : job.reportNames?.ai || `ai-${job.displayCode}.pdf`})`}
             sublabel={aiFailed ? 'Error en IA' : 'IA listo'}
           />
 
@@ -129,42 +159,63 @@ export default function ReportViewerModal({
             <span className="report-score-eyebrow">DESCARGA DE INFORMES PDF</span>
             <div className="report-deliverable-row">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <CheckCircle2 size={16} style={{ color: 'var(--emerald)' }} />
+                {isDemo ? (
+                  <Lock size={16} style={{ color: 'var(--amber)' }} />
+                ) : (
+                  <CheckCircle2 size={16} style={{ color: 'var(--emerald)' }} />
+                )}
                 <div>
-                  <strong style={{ fontSize: 12.5, display: 'block' }}>Similitud listo</strong>
+                  <strong style={{ fontSize: 12.5, display: 'block' }}>
+                    {isDemo ? 'Similitud (Protegido)' : 'Similitud listo'}
+                  </strong>
                   <span style={{ fontSize: 11.5, color: 'var(--text-secondary)' }}>
-                    {job.reportNames?.similarity || `sim-${job.displayCode}.pdf`}
+                    {isDemo ? '🔒 Oculto en cuenta demo' : job.reportNames?.similarity || `sim-${job.displayCode}.pdf`}
                   </span>
                 </div>
               </div>
               <button
                 type="button"
-                className="button button-secondary button-sm"
+                className={`button ${isDemo ? 'button-secondary' : 'button-secondary'} button-sm`}
                 onClick={() => onDownloadCertificate(job, 'similarity')}
+                title={isDemo ? 'Descarga inhabilitada en modo demo' : 'Descargar informe'}
               >
-                <Download size={13} /> Descargar Similitud
+                {isDemo ? <Lock size={13} /> : <Download size={13} />}
+                {isDemo ? 'Descarga Protegida' : 'Descargar Similitud'}
               </button>
             </div>
 
             <div className="report-deliverable-row">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                {aiFailed ? (
+                {isDemo ? (
+                  <Lock size={16} style={{ color: 'var(--amber)' }} />
+                ) : aiFailed ? (
                   <AlertTriangle size={16} style={{ color: 'var(--crimson)' }} />
                 ) : (
                   <CheckCircle2 size={16} style={{ color: 'var(--brand-primary)' }} />
                 )}
                 <div>
                   <strong style={{ fontSize: 12.5, display: 'block' }}>
-                    {aiFailed ? 'Error en IA' : 'IA listo'}
+                    {isDemo ? 'Detección IA (Protegido)' : aiFailed ? 'Error en IA' : 'IA listo'}
                   </strong>
                   <span style={{ fontSize: 11.5, color: 'var(--text-secondary)' }}>
-                    {aiFailed
+                    {isDemo
+                      ? '🔒 Oculto en cuenta demo'
+                      : aiFailed
                       ? 'No se pudo generar este informe. Los demás informes conservan su estado.'
                       : job.reportNames?.ai || `ai-${job.displayCode}.pdf`}
                   </span>
                 </div>
               </div>
-              {aiFailed && onRetryAiReport ? (
+              {isDemo ? (
+                <button
+                  type="button"
+                  className="button button-secondary button-sm"
+                  onClick={() => onDownloadCertificate(job, 'ai')}
+                  title="Descarga inhabilitada en modo demo"
+                >
+                  <Lock size={13} /> Descarga Protegida
+                </button>
+              ) : aiFailed && onRetryAiReport ? (
                 <button
                   type="button"
                   className="button button-primary button-sm"
@@ -218,14 +269,26 @@ export default function ReportViewerModal({
             </div>
             <div className="tech-kv-card">
               <span>Estado Informe de Similitud</span>
-              <strong style={{ color: 'var(--emerald)' }}>
-                Similitud listo ({job.similarityScore}%)
+              <strong style={{ color: isDemo ? 'var(--amber)' : 'var(--emerald)' }}>
+                {isDemo ? '🔒 Resultado Protegido (Modo Demo)' : `Similitud listo (${job.similarityScore}%)`}
               </strong>
             </div>
             <div className="tech-kv-card">
               <span>Estado Informe de IA</span>
-              <strong style={{ color: aiFailed ? 'var(--crimson)' : 'var(--brand-primary)' }}>
-                {aiFailed ? 'Error en IA (Reintentar IA disponible)' : `IA listo (${job.aiScore}%)`}
+              <strong
+                style={{
+                  color: isDemo
+                    ? 'var(--amber)'
+                    : aiFailed
+                    ? 'var(--crimson)'
+                    : 'var(--brand-primary)',
+                }}
+              >
+                {isDemo
+                  ? '🔒 Resultado Protegido (Modo Demo)'
+                  : aiFailed
+                  ? 'Error en IA (Reintentar IA disponible)'
+                  : `IA listo (${job.aiScore}%)`}
               </strong>
             </div>
           </div>
@@ -241,11 +304,11 @@ export default function ReportViewerModal({
             </div>
             <div className="tech-kv-card">
               <span>Archivo PDF Similitud</span>
-              <code>{job.reportNames?.similarity || `sim-${job.displayCode}.pdf`}</code>
+              <code>{isDemo ? '🔒 [Protegido en Demo]' : job.reportNames?.similarity || `sim-${job.displayCode}.pdf`}</code>
             </div>
             <div className="tech-kv-card">
               <span>Archivo PDF IA</span>
-              <code>{job.reportNames?.ai || `ai-${job.displayCode}.pdf`}</code>
+              <code>{isDemo ? '🔒 [Protegido en Demo]' : job.reportNames?.ai || `ai-${job.displayCode}.pdf`}</code>
             </div>
           </div>
         )}

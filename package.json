@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "vite build",
+    "build:standalone": "node build-standalone.mjs",
+    "test": "node test-verification.mjs",
     "preview": "vite preview --host 0.0.0.0 --port 5173"
   },
   "dependencies": {
