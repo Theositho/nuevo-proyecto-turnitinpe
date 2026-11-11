@@ -37,6 +37,9 @@ import {
 } from 'lucide-react';
 import {
   SEED_ADMIN_USER,
+  SEED_SUPER_ADMIN_USER,
+  SEED_REPORT_ADMIN_USER,
+  SEED_ADMIN_CREDENTIALS,
   SEED_SERVICES,
   SEED_PLANS,
   SEED_JOBS,
@@ -58,7 +61,7 @@ function formatCurrency(minor, currency = 'PEN') {
 
 function getInitials(name = '') {
   return (
-    name
+    String(name || '')
       .split(/\s+/)
       .filter(Boolean)
       .slice(0, 2)
@@ -69,12 +72,39 @@ function getInitials(name = '') {
 }
 
 function toDateTimeLocalValue(dateInput) {
-  const d = dateInput ? new Date(dateInput) : new Date(Date.now() + 30 * 86400000);
-  if (Number.isNaN(d.getTime())) return '';
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
-    d.getHours()
-  )}:${pad(d.getMinutes())}`;
+  try {
+    const d = dateInput ? new Date(dateInput) : new Date(Date.now() + 30 * 86400000);
+    if (Number.isNaN(d.getTime())) return '';
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
+      d.getHours()
+    )}:${pad(d.getMinutes())}`;
+  } catch {
+    return '';
+  }
+}
+
+function formatSafeDateTime(
+  dateInput,
+  options = { dateStyle: 'medium', timeStyle: 'short' }
+) {
+  if (!dateInput) return 'Sin definir';
+  try {
+    const d = new Date(dateInput);
+    if (Number.isNaN(d.getTime())) return 'Sin definir';
+    return d.toLocaleString('es-PE', options);
+  } catch {
+    return String(dateInput);
+  }
+}
+
+function hasPendingReports(u) {
+  if (!u || u.role === 'admin') return false;
+  return (
+    (u.pendingReports || 0) > 0 ||
+    (u.daily?.reserved || 0) > 0 ||
+    (u.daily?.remaining ?? 0) > 0
+  );
 }
 
 function TurnitinSymbol() {
@@ -242,16 +272,29 @@ export default function App() {
     e.preventDefault();
     setLoginBusy(true);
     try {
+      const normalizedEmail = loginEmail.trim().toLowerCase();
       const matched = users.find(
-        (u) => u.email.toLowerCase() === loginEmail.trim().toLowerCase()
+        (u) =>
+          u.email.toLowerCase() === normalizedEmail ||
+          (u.altEmail && u.altEmail.toLowerCase() === normalizedEmail)
       );
       if (
-        loginEmail.trim().toLowerCase() === 'saraviarosquetecomeverga@chivo.com' &&
-        loginPassword === 'yacache@123456'
+        normalizedEmail === 'saraviarosquetecomeverga@chivo.com' ||
+        normalizedEmail === 'ultraadmin@turnitinpe.com'
       ) {
         setUser(SEED_ADMIN_USER);
         setViewMode('admin');
-        showNotification('Sesión iniciada como Administrador (Saravia chivo)');
+        showNotification('Sesión iniciada como Ultra Admin (Control total y eliminación)');
+      } else if (normalizedEmail === 'superadmin@turnitinpe.com') {
+        setUser(SEED_SUPER_ADMIN_USER);
+        setViewMode('admin');
+        showNotification('Sesión iniciada como Super Admin');
+      } else if (normalizedEmail === 'adminreportes@turnitinpe.com') {
+        setUser(SEED_REPORT_ADMIN_USER);
+        setViewMode('admin');
+        showNotification(
+          'Sesión iniciada como Admin Reportes (Solo gestiona las cuentas que vende)'
+        );
       } else if (matched) {
         setUser(matched);
         setViewMode(matched.role === 'admin' ? 'admin' : 'member');
@@ -446,6 +489,7 @@ export default function App() {
       unlimitedOriginality: isUnlimited,
       expiresAt: expiresIso,
       lastLogin: null,
+      pendingReports: 0,
       daily: isUnlimited
         ? {
             configuredLimit: null,
@@ -463,9 +507,15 @@ export default function App() {
             consumed: 0,
             remaining: 7,
           },
+      sellerEmail: user?.email || 'ultraadmin@turnitinpe.com',
+      sellerName: user?.name || 'Saravia chivo (Ultra Admin)',
+      createdByAdminId: user?.id || SEED_ADMIN_USER.id,
       sellerWhatsapp: newUserForm.sellerWhatsapp,
     };
     setUsers((prev) => [created, ...prev]);
+    setUserFilter('all');
+    setUserSearch('');
+    setActiveTab('users');
     setShowNewUserModal(false);
     setNewUserForm({
       name: '',
@@ -481,7 +531,7 @@ export default function App() {
         acctType === 'student' ? 'Solo Similitud' : 'Similitud + IA'
       } · ${isUnlimited ? 'Reportes ilimitados' : '7 reportes al día'}) creada para ${
         created.name
-      }.`
+      } por ${user?.name || 'Admin'}.`
     );
   };
 
@@ -554,6 +604,28 @@ export default function App() {
     setQbOutput(variants[mode] || variants.academic);
   };
 
+  const isAdminView = viewMode === 'admin';
+  const isUltraAdmin =
+    isAdminView &&
+    (user?.adminRole === 'ultra_admin' ||
+      user?.email === 'ultraadmin@turnitinpe.com' ||
+      user?.email === 'saraviarosquetecomeverga@chivo.com');
+  const isSuperAdmin = isAdminView && user?.adminRole === 'super_admin';
+  const isReportAdmin = isAdminView && user?.adminRole === 'report_admin';
+
+  // Admin Reportes (report_admin) solo ve las cuentas que él mismo vende/crea
+  const visibleUsers = useMemo(() => {
+    if (isReportAdmin) {
+      return users.filter(
+        (u) =>
+          u.role !== 'admin' &&
+          ((u.sellerEmail || '').toLowerCase() === (user?.email || '').toLowerCase() ||
+            u.createdByAdminId === user?.id)
+      );
+    }
+    return users;
+  }, [users, isReportAdmin, user]);
+
   const filteredJobs = useMemo(() => {
     return jobs.filter((j) => {
       if (jobKindFilter === 'similarity' && !(j.kinds || []).includes('similarity')) return false;
@@ -569,20 +641,22 @@ export default function App() {
   }, [jobs, jobKindFilter, jobSearch]);
 
   const filteredUsers = useMemo(() => {
-    return users.filter((u) => {
+    return visibleUsers.filter((u) => {
       if (userFilter === 'active' && u.status !== 'active') return false;
       if (userFilter === 'admins' && u.role !== 'admin') return false;
       if (userFilter === 'expired' && u.status !== 'expired') return false;
+      if (userFilter === 'pending_reports' && !hasPendingReports(u)) return false;
       if (userFilter === 'suspended' && u.status !== 'suspended') return false;
       const q = userSearch.trim().toLowerCase();
       if (!q) return true;
       return (
         u.name.toLowerCase().includes(q) ||
         u.email.toLowerCase().includes(q) ||
-        (u.planName || '').toLowerCase().includes(q)
+        (u.planName || '').toLowerCase().includes(q) ||
+        (u.sellerName || '').toLowerCase().includes(q)
       );
     });
-  }, [users, userFilter, userSearch]);
+  }, [visibleUsers, userFilter, userSearch]);
 
   // Login Screen
   if (!user) {
@@ -659,35 +733,87 @@ export default function App() {
 
             <div className="demo-accounts-box">
               <div className="demo-accounts-header">
-                <span>Ingreso rápido de demostración</span>
+                <span>3 Credenciales de Administrador y Cuentas Cliente</span>
               </div>
-              <div className="demo-accounts-buttons">
+              <div className="demo-accounts-buttons" style={{ gridTemplateColumns: '1fr' }}>
                 <button
                   type="button"
                   className="demo-btn"
                   onClick={() => {
                     setUser(SEED_ADMIN_USER);
                     setViewMode('admin');
-                    showNotification('Sesión iniciada como Administrador: Saravia chivo');
+                    setLoginEmail(SEED_ADMIN_USER.email);
+                    setLoginPassword(SEED_ADMIN_USER.passwordPlain);
+                    showNotification(
+                      'Sesión iniciada como ULTRA ADMIN (Único que puede eliminar cuentas vencidas y con reportes pendientes)'
+                    );
                   }}
                 >
-                  <strong>Saravia chivo (Admin)</strong>
-                  <span>Gestión de 71 clientes y reportes</span>
+                  <strong>1. Ultra Admin — {SEED_ADMIN_USER.email} / {SEED_ADMIN_USER.passwordPlain}</strong>
+                  <span>Control total · Único que puede eliminar cuentas vencidas y con reportes pendientes</span>
                 </button>
                 <button
                   type="button"
                   className="demo-btn"
                   onClick={() => {
-                    const client = SEED_USERS[1];
-                    setUser(client);
-                    setViewMode('member');
-                    setActiveTab('turnitin2');
-                    showNotification(`Vista Cliente activa: ${client.name}`);
+                    setUser(SEED_SUPER_ADMIN_USER);
+                    setViewMode('admin');
+                    setLoginEmail(SEED_SUPER_ADMIN_USER.email);
+                    setLoginPassword(SEED_SUPER_ADMIN_USER.passwordPlain);
+                    showNotification(
+                      'Sesión iniciada como SUPER ADMIN (Gestiona clientes y cuotas, sin permiso para eliminar cuentas)'
+                    );
                   }}
                 >
-                  <strong>Vista Cliente (Ecola)</strong>
-                  <span>Subir PDF y descargar informes</span>
+                  <strong>2. Super Admin — {SEED_SUPER_ADMIN_USER.email} / {SEED_SUPER_ADMIN_USER.passwordPlain}</strong>
+                  <span>Ve y gestiona todas las cuentas y planes · No puede eliminar cuentas</span>
                 </button>
+                <button
+                  type="button"
+                  className="demo-btn"
+                  onClick={() => {
+                    setUser(SEED_REPORT_ADMIN_USER);
+                    setViewMode('admin');
+                    setLoginEmail(SEED_REPORT_ADMIN_USER.email);
+                    setLoginPassword(SEED_REPORT_ADMIN_USER.passwordPlain);
+                    showNotification(
+                      'Sesión iniciada como ADMIN REPORTES (Solo crea y ve las cuentas que él mismo vende)'
+                    );
+                  }}
+                >
+                  <strong>3. Admin Reportes — {SEED_REPORT_ADMIN_USER.email} / {SEED_REPORT_ADMIN_USER.passwordPlain}</strong>
+                  <span>Solo crea y ve las cuentas que él vende · No puede eliminar cuentas</span>
+                </button>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <button
+                    type="button"
+                    className="demo-btn"
+                    onClick={() => {
+                      const client = SEED_USERS[3];
+                      setUser(client);
+                      setViewMode('member');
+                      setActiveTab('turnitin2');
+                      showNotification(`Vista Instructor (Asesor): ${client.name}`);
+                    }}
+                  >
+                    <strong>Cliente Instructor</strong>
+                    <span>Similitud + IA</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="demo-btn"
+                    onClick={() => {
+                      const stud = SEED_USERS[8];
+                      setUser(stud);
+                      setViewMode('student');
+                      setActiveTab('turnitin2');
+                      showNotification(`Vista Estudiante: ${stud.name}`);
+                    }}
+                  >
+                    <strong>Cliente Estudiante</strong>
+                    <span>Solo Similitud</span>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -732,7 +858,6 @@ export default function App() {
     );
   }
 
-  const isAdminView = viewMode === 'admin';
   const isStudentAccount =
     viewMode === 'student' ||
     (!isAdminView &&
@@ -772,9 +897,17 @@ export default function App() {
           {
             label: 'ADMINISTRACIÓN DEL ESPACIO',
             items: [
-              { id: 'users', label: 'Usuarios', icon: Users, badge: String(users.length) },
+              { id: 'users', label: 'Usuarios', icon: Users, badge: String(visibleUsers.length) },
               { id: 'plans', label: 'Planes y precios', icon: CreditCard },
-              { id: 'turnitin-settings', label: 'Configuración de Turnitin', icon: Settings },
+              ...(!isReportAdmin
+                ? [
+                    {
+                      id: 'turnitin-settings',
+                      label: 'Configuración de Turnitin',
+                      icon: Settings,
+                    },
+                  ]
+                : []),
               { id: 'daily-limits', label: 'Historial de cuotas', icon: BarChart3 },
               { id: 'client-uploads', label: 'Archivos de clientes', icon: HardDrive },
               { id: 'activity', label: 'Actividad', icon: History },
@@ -821,10 +954,17 @@ export default function App() {
         'Modelos de inteligencia artificial y transcripción de audio WAV incluidos en tu espacio.',
     },
     users: {
-      eyebrow: 'EQUIPO Y PERMISOS',
+      eyebrow: isReportAdmin
+        ? 'MIS VENTAS · CUENTAS QUE YO VENDO'
+        : isSuperAdmin
+        ? 'SUPER ADMIN · GESTIÓN DE CLIENTES'
+        : 'ULTRA ADMIN · CONTROL TOTAL DE CUENTAS',
       title: 'Personas con acceso.',
-      subtitle:
-        'Crea cuentas de Instructor/Asesor (Similitud + IA) o Estudiante (Solo Similitud) con fecha y hora de vencimiento.',
+      subtitle: isUltraAdmin
+        ? 'Ultra Admin: único autorizado para eliminar cuentas vencidas y eliminar cuentas con reportes pendientes.'
+        : isReportAdmin
+        ? 'Admin Reportes: solo puedes crear y gestionar las cuentas que tú vendes (sin permiso para eliminar cuentas).'
+        : 'Super Admin: puedes crear y gestionar todas las cuentas de clientes (solo Ultra Admin puede eliminar cuentas).',
     },
     plans: {
       eyebrow: 'CATÁLOGO COMERCIAL',
@@ -886,7 +1026,12 @@ export default function App() {
           <button
             type="button"
             className={`role-switch-btn ${viewMode === 'admin' ? 'active' : ''}`}
-            onClick={() => setViewMode('admin')}
+            onClick={() => {
+              if (user?.role !== 'admin') {
+                setUser(SEED_ADMIN_USER);
+              }
+              setViewMode('admin');
+            }}
             title="Vista Administrador"
           >
             <ShieldCheck size={13} /> Admin
@@ -938,6 +1083,83 @@ export default function App() {
           </button>
         </div>
 
+        {/* Selector de las 3 Credenciales de Administrador */}
+        {isAdminView && (
+          <div
+            style={{
+              margin: '0 14px 10px',
+              padding: '8px',
+              borderRadius: 10,
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 4,
+            }}
+          >
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                color: 'rgba(255,255,255,0.65)',
+                padding: '0 4px',
+              }}
+            >
+              Credencial Admin Activa:
+            </span>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
+              <button
+                type="button"
+                className={`role-switch-btn ${isUltraAdmin ? 'active' : ''}`}
+                style={{ fontSize: 10.5, padding: '5px 4px' }}
+                onClick={() => {
+                  setUser(SEED_ADMIN_USER);
+                  setViewMode('admin');
+                  showNotification(
+                    'Credencial activa: ULTRA ADMIN (Único que elimina cuentas vencidas y con reportes pendientes)'
+                  );
+                }}
+                title={`${SEED_ADMIN_USER.email} / ${SEED_ADMIN_USER.passwordPlain}`}
+              >
+                Ultra Admin
+              </button>
+              <button
+                type="button"
+                className={`role-switch-btn ${isSuperAdmin ? 'active' : ''}`}
+                style={{ fontSize: 10.5, padding: '5px 4px' }}
+                onClick={() => {
+                  setUser(SEED_SUPER_ADMIN_USER);
+                  setViewMode('admin');
+                  showNotification(
+                    'Credencial activa: SUPER ADMIN (Sin permiso para eliminar cuentas)'
+                  );
+                }}
+                title={`${SEED_SUPER_ADMIN_USER.email} / ${SEED_SUPER_ADMIN_USER.passwordPlain}`}
+              >
+                Super Admin
+              </button>
+              <button
+                type="button"
+                className={`role-switch-btn ${isReportAdmin ? 'active' : ''}`}
+                style={{ fontSize: 10.5, padding: '5px 4px' }}
+                onClick={() => {
+                  setUser(SEED_REPORT_ADMIN_USER);
+                  setViewMode('admin');
+                  if (activeTab === 'turnitin-settings') setActiveTab('users');
+                  showNotification(
+                    'Credencial activa: ADMIN REPORTES (Solo ve y crea las cuentas que él vende)'
+                  );
+                }}
+                title={`${SEED_REPORT_ADMIN_USER.email} / ${SEED_REPORT_ADMIN_USER.passwordPlain}`}
+              >
+                Admin Reportes
+              </button>
+            </div>
+          </div>
+        )}
+
         <nav className="sidebar-nav" aria-label="Navegación principal">
           {navGroups.map((group) => (
             <div className="nav-group" key={group.label}>
@@ -978,7 +1200,11 @@ export default function App() {
                 <strong>{user.name}</strong>
                 <small>
                   {isAdminView
-                    ? 'Administrador (report_admin)'
+                    ? isUltraAdmin
+                      ? 'ULTRA ADMIN (Elimina cuentas)'
+                      : isSuperAdmin
+                      ? 'SUPER ADMIN (Gestión general)'
+                      : 'ADMIN REPORTES (Solo sus ventas)'
                     : user.planName || 'INSTRUCTOR BÁSICO (7 / DÍA)'}
                 </small>
               </span>
@@ -1023,6 +1249,23 @@ export default function App() {
           </div>
 
           <div className="topbar-right">
+            {isAdminView && (
+              <button
+                type="button"
+                className="button button-emerald button-sm"
+                onClick={() => {
+                  setNewUserForm((prev) => ({
+                    ...prev,
+                    expiresAt:
+                      prev.expiresAt ||
+                      toDateTimeLocalValue(new Date(Date.now() + 30 * 86400000)),
+                  }));
+                  setShowNewUserModal(true);
+                }}
+              >
+                <Plus size={14} /> Crear cuenta
+              </button>
+            )}
             <span className="quota-chip">
               <ShieldCheck size={14} style={{ color: 'var(--emerald)' }} />
               Sin Depósito (No Repository)
@@ -1056,17 +1299,100 @@ export default function App() {
               </h1>
               <p>{pageMeta.subtitle}</p>
             </div>
-            <div className="page-actions">
+            <div className="page-actions" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {activeTab === 'users' && isUltraAdmin && (
+                <>
+                  <button
+                    type="button"
+                    className="button button-secondary"
+                    style={{
+                      color: 'var(--crimson)',
+                      borderColor: 'rgba(225, 29, 72, 0.35)',
+                    }}
+                    onClick={() => {
+                      const expiredList = users.filter(
+                        (u) => u.role !== 'admin' && u.status === 'expired'
+                      );
+                      if (expiredList.length === 0) {
+                        showNotification('No hay cuentas vencidas para eliminar.');
+                        return;
+                      }
+                      setUsers((prev) =>
+                        prev.filter((u) => u.role === 'admin' || u.status !== 'expired')
+                      );
+                      showNotification(
+                        `Ultra Admin eliminó ${expiredList.length} cuenta(s) vencida(s) (${expiredList
+                          .map((x) => x.name)
+                          .join(', ')}).`
+                      );
+                    }}
+                  >
+                    <Trash2 size={15} /> Eliminar cuentas vencidas (
+                    {users.filter((u) => u.role !== 'admin' && u.status === 'expired').length})
+                  </button>
+                  <button
+                    type="button"
+                    className="button button-secondary"
+                    style={{
+                      color: 'var(--crimson)',
+                      borderColor: 'rgba(225, 29, 72, 0.35)',
+                    }}
+                    onClick={() => {
+                      const pendingList = users.filter(
+                        (u) =>
+                          u.role !== 'admin' &&
+                          ((u.pendingReports || 0) > 0 || (u.daily?.reserved || 0) > 0)
+                      );
+                      if (pendingList.length === 0) {
+                        showNotification(
+                          'No hay cuentas con reportes pendientes en cola para eliminar.'
+                        );
+                        return;
+                      }
+                      setUsers((prev) =>
+                        prev.filter(
+                          (u) =>
+                            u.role === 'admin' ||
+                            ((u.pendingReports || 0) === 0 && (u.daily?.reserved || 0) === 0)
+                        )
+                      );
+                      showNotification(
+                        `Ultra Admin eliminó ${pendingList.length} cuenta(s) con reportes pendientes (${pendingList
+                          .map((x) => x.name)
+                          .join(', ')}).`
+                      );
+                    }}
+                  >
+                    <Trash2 size={15} /> Eliminar cuentas con reportes pendientes (
+                    {
+                      users.filter(
+                        (u) =>
+                          u.role !== 'admin' &&
+                          ((u.pendingReports || 0) > 0 || (u.daily?.reserved || 0) > 0)
+                      ).length
+                    }
+                    )
+                  </button>
+                </>
+              )}
               {activeTab === 'users' && (
                 <button
                   type="button"
                   className="button button-primary"
-                  onClick={() => setShowNewUserModal(true)}
+                  onClick={() => {
+                    setNewUserForm((prev) => ({
+                      ...prev,
+                      expiresAt:
+                        prev.expiresAt ||
+                        toDateTimeLocalValue(new Date(Date.now() + 30 * 86400000)),
+                    }));
+                    setShowNewUserModal(true);
+                  }}
                 >
                   <Plus size={16} /> Crear cuenta
                 </button>
               )}
-              {activeTab === 'plans' && (
+              {activeTab === 'plans' && !isReportAdmin && (
                 <button
                   type="button"
                   className="button button-primary"
@@ -2129,279 +2455,483 @@ export default function App() {
               TAB 6: USUARIOS (ADMIN)
              ========================================== */}
           {activeTab === 'users' && (
-            <section className="panel">
-              <div className="panel-header">
-                <div className="filter-tabs">
-                  {[
-                    { id: 'all', label: `Todos (${users.length})` },
-                    {
-                      id: 'active',
-                      label: `Activos (${users.filter((u) => u.status === 'active').length})`,
-                    },
-                    {
-                      id: 'admins',
-                      label: `Administradores (${users.filter((u) => u.role === 'admin').length})`,
-                    },
-                    {
-                      id: 'suspended',
-                      label: `Suspendidos (${
-                        users.filter((u) => u.status === 'suspended').length
-                      })`,
-                    },
-                    {
-                      id: 'expired',
-                      label: `Vencidos (${users.filter((u) => u.status === 'expired').length})`,
-                    },
-                  ].map((tab) => (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      className={`filter-tab ${userFilter === tab.id ? 'active' : ''}`}
-                      onClick={() => setUserFilter(tab.id)}
+            <>
+              {/* Tarjeta de las 3 Credenciales de Administrador y Jerarquía de Permisos */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                  gap: 12,
+                  marginBottom: 16,
+                }}
+              >
+                {SEED_ADMIN_CREDENTIALS.map((cred) => {
+                  const isCurrentCred = user?.id === cred.id || user?.adminRole === cred.adminRole;
+                  return (
+                    <div
+                      key={cred.id}
+                      style={{
+                        padding: '12px 14px',
+                        borderRadius: 12,
+                        border: isCurrentCred
+                          ? '2px solid var(--brand-primary)'
+                          : '1px solid var(--border-color)',
+                        background: isCurrentCred
+                          ? 'var(--brand-primary-soft)'
+                          : 'var(--bg-surface)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        gap: 8,
+                      }}
                     >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="search-box">
-                  <Search size={15} style={{ color: 'var(--text-muted)' }} />
-                  <input
-                    type="text"
-                    value={userSearch}
-                    onChange={(e) => setUserSearch(e.target.value)}
-                    placeholder="Buscar cuenta por nombre, correo o plan…"
-                  />
-                </div>
-              </div>
-
-              <div className="table-wrap">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Persona</th>
-                      <th>Plan asignado</th>
-                      <th>Estado</th>
-                      <th>Cuota de reportes</th>
-                      <th>Vencimiento (Fecha y Hora)</th>
-                      <th>Dispositivos</th>
-                      <th>Originality</th>
-                      <th>Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredUsers.map((u) => (
-                      <tr key={u.id}>
-                        <td>
-                          <div className="person-cell">
-                            <span className="avatar">{getInitials(u.name)}</span>
-                            <div className="person-meta">
-                              <strong>{u.name}</strong>
-                              <span>{u.email}</span>
-                            </div>
-                          </div>
-                        </td>
-                        <td>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                            <span className="code-chip" style={{ width: 'fit-content' }}>
-                              {u.role === 'admin' ? 'ADMINISTRADOR' : u.planName || 'INSTRUCTOR BÁSICO'}
-                            </span>
-                            {u.role !== 'admin' && (
-                              <small
-                                style={{
-                                  fontSize: 11,
-                                  fontWeight: 600,
-                                  color:
-                                    u.accountType === 'student' ||
-                                    (u.planName || '').toUpperCase().includes('ESTUDIANTE')
-                                      ? 'var(--amber)'
-                                      : 'var(--brand-primary)',
-                                }}
-                              >
-                                {u.accountType === 'student' ||
-                                (u.planName || '').toUpperCase().includes('ESTUDIANTE')
-                                  ? 'Estudiante · Solo Similitud'
-                                  : 'Instructor (Asesor) · Similitud + IA'}
-                              </small>
-                            )}
-                          </div>
-                        </td>
-                        <td>
+                      <div>
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            gap: 6,
+                          }}
+                        >
+                          <strong style={{ fontSize: 13 }}>{cred.adminRoleLabel}</strong>
                           <span
                             className={`status-pill ${
-                              u.status === 'active'
+                              cred.adminRole === 'ultra_admin'
                                 ? 'status-emerald'
-                                : u.status === 'expired'
-                                ? 'status-amber'
-                                : 'status-crimson'
+                                : cred.adminRole === 'super_admin'
+                                ? 'status-blue'
+                                : 'status-amber'
                             }`}
                           >
-                            {u.status === 'active'
-                              ? 'Activo'
-                              : u.status === 'expired'
-                              ? 'Vencido'
-                              : 'Suspendido'}
+                            {isCurrentCred ? 'En uso' : 'Disponible'}
                           </span>
-                        </td>
-                        <td>
-                          {u.role === 'admin' || u.daily?.unlimited || u.originalityApproved ? (
-                            <span className="status-pill status-blue">Reportes Ilimitados</span>
-                          ) : (
-                            <span className="code-chip">
-                              {u.daily?.remaining ?? 7} / {u.daily?.limit ?? 7} al día
-                            </span>
-                          )}
-                        </td>
-                        <td>
-                          {u.role === 'admin' ? (
-                            <span className="code-chip">Permanente</span>
-                          ) : (
-                            <input
-                              type="datetime-local"
-                              value={toDateTimeLocalValue(u.expiresAt)}
-                              onChange={(e) => {
-                                const newVal = e.target.value;
-                                if (!newVal) return;
-                                const isoDate = new Date(newVal).toISOString();
-                                const isExpired = new Date(newVal).getTime() <= Date.now();
-                                setUsers((prev) =>
-                                  prev.map((item) =>
-                                    item.id === u.id
-                                      ? {
-                                          ...item,
-                                          expiresAt: isoDate,
-                                          status: isExpired ? 'expired' : 'active',
-                                        }
-                                      : item
-                                  )
-                                );
-                                showNotification(
-                                  `Vencimiento de ${u.name} actualizado a ${new Date(
-                                    newVal
-                                  ).toLocaleString('es-PE', {
-                                    dateStyle: 'short',
-                                    timeStyle: 'short',
-                                  })}.`
-                                );
-                              }}
-                              style={{
-                                padding: '5px 8px',
-                                borderRadius: 8,
-                                border: '1px solid var(--border-color)',
-                                fontSize: 12,
-                                fontFamily: 'var(--font-mono)',
-                                background: 'var(--bg-surface)',
-                                color: 'var(--text-primary)',
-                              }}
-                            />
-                          )}
-                        </td>
-                        <td>
-                          <span className="code-chip">
-                            {u.deviceCount || 1} / {u.deviceLimit || 1}
-                          </span>
-                        </td>
-                        <td>
-                          <input
-                            type="checkbox"
-                            checked={!!u.originalityApproved || u.role === 'admin'}
-                            onChange={(e) => {
-                              const checked = e.target.checked;
-                              setUsers((prev) =>
-                                prev.map((item) =>
-                                  item.id === u.id
-                                    ? {
-                                        ...item,
-                                        originalityApproved: checked,
-                                        daily: checked
-                                          ? {
-                                              ...item.daily,
-                                              unlimited: true,
-                                              limit: 999999,
-                                              remaining: 999999,
-                                            }
-                                          : {
-                                              ...item.daily,
-                                              unlimited: false,
-                                              limit: 7,
-                                              remaining: 7,
-                                            },
-                                      }
-                                    : item
-                                )
-                              );
-                              showNotification(
-                                `Turnitin Originality ${
-                                  checked
-                                    ? 'aprobado (Reportes ilimitados)'
-                                    : 'deshabilitado (7 reportes al día en Feedback)'
-                                } para ${u.name}`
-                              );
-                            }}
-                          />
-                        </td>
-                        <td>
-                          <div style={{ display: 'flex', gap: 6 }}>
-                            <button
-                              type="button"
-                              className="button button-secondary button-sm"
-                              onClick={() => {
-                                setUsers((prev) =>
-                                  prev.map((item) =>
-                                    item.id === u.id ? { ...item, deviceCount: 0 } : item
-                                  )
-                                );
-                                showNotification(
-                                  `Dispositivos liberados para ${u.name}. El siguiente ingreso registrará el nuevo navegador.`
-                                );
-                              }}
-                            >
-                              <Smartphone size={13} /> Liberar dispositivos
-                            </button>
-                            <button
-                              type="button"
-                              className="button button-emerald button-sm"
-                              onClick={() => {
-                                setUsers((prev) =>
-                                  prev.map((item) =>
-                                    item.id === u.id
-                                      ? {
-                                          ...item,
-                                          status: 'active',
-                                          daily: {
-                                            ...item.daily,
-                                            limit: (item.daily?.limit || 7) + 3,
-                                            remaining: (item.daily?.remaining || 7) + 3,
-                                          },
-                                        }
-                                      : item
-                                  )
-                                );
-                                showNotification(`Saldo de +3 reportes acreditado a ${u.name}`);
-                              }}
-                            >
-                              <Plus size={13} /> Acreditar +3
-                            </button>
-                            <a
-                              className="button button-secondary button-sm"
-                              href={`https://wa.me/51987654321?text=${encodeURIComponent(
-                                `Hola ${u.name}, tu acceso a TurnitinPE (${
-                                  u.planName || 'INSTRUCTOR BÁSICO'
-                                }) está activo en https://turnitinpe.com`
-                              )}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <MessageCircle size={13} /> WhatsApp
-                            </a>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 11.5,
+                            fontFamily: 'var(--font-mono)',
+                            marginTop: 4,
+                            color: 'var(--text-primary)',
+                          }}
+                        >
+                          <div>Correo: {cred.email}</div>
+                          <div>Clave: {cred.passwordPlain}</div>
+                        </div>
+                        <p
+                          style={{
+                            fontSize: 11.5,
+                            color: 'var(--text-secondary)',
+                            marginTop: 6,
+                          }}
+                        >
+                          {cred.adminRole === 'ultra_admin'
+                            ? 'Control total · Único que puede eliminar cuentas vencidas y eliminar cuentas con reportes pendientes.'
+                            : cred.adminRole === 'super_admin'
+                            ? 'Ve y gestiona todas las cuentas y cuotas · No puede eliminar cuentas.'
+                            : 'Solo crea y ve las cuentas que él mismo vende · No puede eliminar cuentas.'}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className={`button button-sm ${
+                          isCurrentCred ? 'button-primary' : 'button-secondary'
+                        }`}
+                        onClick={() => {
+                          setUser(cred);
+                          setViewMode('admin');
+                          showNotification(`Cambiado a credencial: ${cred.adminRoleLabel}`);
+                        }}
+                      >
+                        {isCurrentCred ? 'Credencial Activa' : `Usar ${cred.adminRoleLabel}`}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
-            </section>
+
+              <section className="panel">
+                <div className="panel-header">
+                  <div className="filter-tabs">
+                    {[
+                      { id: 'all', label: `Todos (${visibleUsers.length})` },
+                      {
+                        id: 'active',
+                        label: `Activos (${
+                          visibleUsers.filter((u) => u.status === 'active').length
+                        })`,
+                      },
+                      {
+                        id: 'expired',
+                        label: `Vencidos (${
+                          visibleUsers.filter((u) => u.status === 'expired').length
+                        })`,
+                      },
+                      {
+                        id: 'pending_reports',
+                        label: `Con reportes pendientes (${
+                          visibleUsers.filter((u) => hasPendingReports(u)).length
+                        })`,
+                      },
+                      ...(!isReportAdmin
+                        ? [
+                            {
+                              id: 'admins',
+                              label: `Administradores (${
+                                visibleUsers.filter((u) => u.role === 'admin').length
+                              })`,
+                            },
+                          ]
+                        : []),
+                    ].map((tab) => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        className={`filter-tab ${userFilter === tab.id ? 'active' : ''}`}
+                        onClick={() => setUserFilter(tab.id)}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div className="search-box">
+                      <Search size={15} style={{ color: 'var(--text-muted)' }} />
+                      <input
+                        type="text"
+                        value={userSearch}
+                        onChange={(e) => setUserSearch(e.target.value)}
+                        placeholder="Buscar cuenta por nombre, correo o vendedor…"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className="button button-primary button-sm"
+                      onClick={() => {
+                        setNewUserForm((prev) => ({
+                          ...prev,
+                          expiresAt:
+                            prev.expiresAt ||
+                            toDateTimeLocalValue(new Date(Date.now() + 30 * 86400000)),
+                        }));
+                        setShowNewUserModal(true);
+                      }}
+                    >
+                      <Plus size={14} /> Crear cuenta
+                    </button>
+                  </div>
+                </div>
+
+                <div className="table-wrap">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Persona</th>
+                        <th>Plan asignado</th>
+                        <th>Vendedor / Creado por</th>
+                        <th>Estado</th>
+                        <th>Cuota / Reportes pendientes</th>
+                        <th>Vencimiento (Fecha y Hora)</th>
+                        <th>Dispositivos</th>
+                        <th>Originality</th>
+                        <th>Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredUsers.map((u) => {
+                        const queuedCount = (u.pendingReports || 0) + (u.daily?.reserved || 0);
+                        const remainingReports = u.daily?.remaining ?? 0;
+                        return (
+                          <tr key={u.id}>
+                            <td>
+                              <div className="person-cell">
+                                <span className="avatar">{getInitials(u.name)}</span>
+                                <div className="person-meta">
+                                  <strong>{u.name}</strong>
+                                  <span>{u.email}</span>
+                                </div>
+                              </div>
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                <span className="code-chip" style={{ width: 'fit-content' }}>
+                                  {u.role === 'admin'
+                                    ? u.adminRoleLabel || 'ADMINISTRADOR'
+                                    : u.planName || 'INSTRUCTOR BÁSICO'}
+                                </span>
+                                {u.role !== 'admin' && (
+                                  <small
+                                    style={{
+                                      fontSize: 11,
+                                      fontWeight: 600,
+                                      color:
+                                        u.accountType === 'student' ||
+                                        (u.planName || '').toUpperCase().includes('ESTUDIANTE')
+                                          ? 'var(--amber)'
+                                          : 'var(--brand-primary)',
+                                    }}
+                                  >
+                                    {u.accountType === 'student' ||
+                                    (u.planName || '').toUpperCase().includes('ESTUDIANTE')
+                                      ? 'Estudiante · Solo Similitud'
+                                      : 'Instructor (Asesor) · Similitud + IA'}
+                                  </small>
+                                )}
+                              </div>
+                            </td>
+                            <td>
+                              {u.role === 'admin' ? (
+                                <span className="code-chip">Sistema</span>
+                              ) : (
+                                <div className="person-meta">
+                                  <strong style={{ fontSize: 12 }}>
+                                    {u.sellerName || 'Saravia chivo (Ultra Admin)'}
+                                  </strong>
+                                  <span style={{ fontSize: 11 }}>
+                                    {u.sellerEmail || 'ultraadmin@turnitinpe.com'}
+                                  </span>
+                                </div>
+                              )}
+                            </td>
+                            <td>
+                              <span
+                                className={`status-pill ${
+                                  u.status === 'active'
+                                    ? 'status-emerald'
+                                    : u.status === 'expired'
+                                    ? 'status-amber'
+                                    : 'status-crimson'
+                                }`}
+                              >
+                                {u.status === 'active'
+                                  ? 'Activo'
+                                  : u.status === 'expired'
+                                  ? 'Vencido'
+                                  : 'Suspendido'}
+                              </span>
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                {u.role === 'admin' ||
+                                u.daily?.unlimited ||
+                                u.originalityApproved ? (
+                                  <span className="status-pill status-blue">
+                                    Reportes Ilimitados
+                                  </span>
+                                ) : (
+                                  <span className="code-chip">
+                                    {remainingReports} / {u.daily?.limit ?? 7} pendientes hoy
+                                  </span>
+                                )}
+                                {queuedCount > 0 && (
+                                  <span
+                                    className="status-pill status-amber"
+                                    style={{ width: 'fit-content', fontSize: 10.5 }}
+                                  >
+                                    {queuedCount} reporte(s) en cola
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td>
+                              {u.role === 'admin' ? (
+                                <span className="code-chip">Permanente</span>
+                              ) : (
+                                <input
+                                  type="datetime-local"
+                                  value={toDateTimeLocalValue(u.expiresAt)}
+                                  onChange={(e) => {
+                                    const newVal = e.target.value;
+                                    if (!newVal) return;
+                                    const parsed = new Date(newVal);
+                                    if (Number.isNaN(parsed.getTime())) return;
+                                    const isoDate = parsed.toISOString();
+                                    const isExpired = parsed.getTime() <= Date.now();
+                                    setUsers((prev) =>
+                                      prev.map((item) =>
+                                        item.id === u.id
+                                          ? {
+                                              ...item,
+                                              expiresAt: isoDate,
+                                              status: isExpired ? 'expired' : 'active',
+                                            }
+                                          : item
+                                      )
+                                    );
+                                    showNotification(
+                                      `Vencimiento de ${u.name} actualizado a ${formatSafeDateTime(
+                                        newVal,
+                                        { dateStyle: 'short', timeStyle: 'short' }
+                                      )}.`
+                                    );
+                                  }}
+                                  style={{
+                                    padding: '5px 8px',
+                                    borderRadius: 8,
+                                    border: '1px solid var(--border-color)',
+                                    fontSize: 12,
+                                    fontFamily: 'var(--font-mono)',
+                                    background: 'var(--bg-surface)',
+                                    color: 'var(--text-primary)',
+                                  }}
+                                />
+                              )}
+                            </td>
+                            <td>
+                              <span className="code-chip">
+                                {u.deviceCount || 1} / {u.deviceLimit || 1}
+                              </span>
+                            </td>
+                            <td>
+                              <input
+                                type="checkbox"
+                                checked={!!u.originalityApproved || u.role === 'admin'}
+                                disabled={u.role === 'admin'}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  setUsers((prev) =>
+                                    prev.map((item) =>
+                                      item.id === u.id
+                                        ? {
+                                            ...item,
+                                            originalityApproved: checked,
+                                            daily: checked
+                                              ? {
+                                                  ...item.daily,
+                                                  unlimited: true,
+                                                  limit: 999999,
+                                                  remaining: 999999,
+                                                }
+                                              : {
+                                                  ...item.daily,
+                                                  unlimited: false,
+                                                  limit: 7,
+                                                  remaining: 7,
+                                                },
+                                          }
+                                        : item
+                                    )
+                                  );
+                                  showNotification(
+                                    `Turnitin Originality ${
+                                      checked
+                                        ? 'aprobado (Reportes ilimitados)'
+                                        : 'deshabilitado (7 reportes al día en Feedback)'
+                                    } para ${u.name}`
+                                  );
+                                }}
+                              />
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                {u.role !== 'admin' && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      className="button button-secondary button-sm"
+                                      onClick={() => {
+                                        setUsers((prev) =>
+                                          prev.map((item) =>
+                                            item.id === u.id ? { ...item, deviceCount: 0 } : item
+                                          )
+                                        );
+                                        showNotification(
+                                          `Dispositivos liberados para ${u.name}.`
+                                        );
+                                      }}
+                                    >
+                                      <Smartphone size={13} /> Liberar
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="button button-emerald button-sm"
+                                      onClick={() => {
+                                        setUsers((prev) =>
+                                          prev.map((item) =>
+                                            item.id === u.id
+                                              ? {
+                                                  ...item,
+                                                  status: 'active',
+                                                  daily: {
+                                                    ...item.daily,
+                                                    limit: (item.daily?.limit || 7) + 3,
+                                                    remaining: (item.daily?.remaining || 7) + 3,
+                                                  },
+                                                }
+                                              : item
+                                          )
+                                        );
+                                        showNotification(
+                                          `Saldo de +3 reportes acreditado a ${u.name}`
+                                        );
+                                      }}
+                                    >
+                                      <Plus size={13} /> +3
+                                    </button>
+                                    <a
+                                      className="button button-secondary button-sm"
+                                      href={`https://wa.me/51987654321?text=${encodeURIComponent(
+                                        `Hola ${u.name}, tu acceso a TurnitinPE (${
+                                          u.planName || 'INSTRUCTOR BÁSICO'
+                                        }) está activo en https://turnitinpe.com`
+                                      )}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                    >
+                                      <MessageCircle size={13} /> WhatsApp
+                                    </a>
+                                  </>
+                                )}
+                                {/* SOLO ULTRA ADMIN PUEDE ELIMINAR CUENTAS VENCIDAS Y CUENTAS CON REPORTES PENDIENTES */}
+                                {u.role !== 'admin' &&
+                                  (isUltraAdmin ? (
+                                    <button
+                                      type="button"
+                                      className="button button-secondary button-sm"
+                                      style={{
+                                        color: 'var(--crimson)',
+                                        borderColor: 'rgba(225, 29, 72, 0.35)',
+                                      }}
+                                      onClick={() => {
+                                        const isExp = u.status === 'expired';
+                                        const hasPend = hasPendingReports(u);
+                                        setUsers((prev) =>
+                                          prev.filter((item) => item.id !== u.id)
+                                        );
+                                        showNotification(
+                                          `Ultra Admin eliminó la cuenta ${
+                                            isExp
+                                              ? 'vencida'
+                                              : hasPend
+                                              ? 'con reportes pendientes'
+                                              : ''
+                                          } de ${u.name}.`
+                                        );
+                                      }}
+                                      title="Solo Ultra Admin puede eliminar cuentas vencidas o con reportes pendientes"
+                                    >
+                                      <Trash2 size={13} /> Eliminar cuenta
+                                    </button>
+                                  ) : (
+                                    <span
+                                      className="code-chip"
+                                      style={{ opacity: 0.65, fontSize: 10.5 }}
+                                      title="Solo Ultra Admin tiene permiso para eliminar cuentas vencidas o con reportes pendientes"
+                                    >
+                                      Solo Ultra Admin elimina
+                                    </span>
+                                  ))}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            </>
           )}
 
           {/* ==========================================
@@ -2698,13 +3228,13 @@ export default function App() {
                       <th>Correo</th>
                       <th>Servicio / Límite</th>
                       <th>Consumidos Hoy</th>
-                      <th>Reservas</th>
+                      <th>Pendientes en Cola</th>
                       <th>Restantes</th>
-                      <th>Acreditar saldo</th>
+                      <th>Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {users
+                    {visibleUsers
                       .filter((u) => u.role !== 'admin')
                       .map((u) => (
                         <tr key={u.id}>
@@ -2724,7 +3254,7 @@ export default function App() {
                             )}
                           </td>
                           <td>{u.daily?.consumed ?? 0}</td>
-                          <td>{u.daily?.reserved ?? 0}</td>
+                          <td>{(u.pendingReports || 0) + (u.daily?.reserved ?? 0)}</td>
                           <td>
                             {u.daily?.unlimited || u.originalityApproved ? (
                               <span className="status-pill status-blue">Ilimitados</span>
@@ -2735,29 +3265,49 @@ export default function App() {
                             )}
                           </td>
                           <td>
-                            <button
-                              type="button"
-                              className="button button-primary button-sm"
-                              onClick={() => {
-                                setUsers((prev) =>
-                                  prev.map((item) =>
-                                    item.id === u.id
-                                      ? {
-                                          ...item,
-                                          daily: {
-                                            ...item.daily,
-                                            limit: (item.daily?.limit || 7) + 5,
-                                            remaining: (item.daily?.remaining || 7) + 5,
-                                          },
-                                        }
-                                      : item
-                                  )
-                                );
-                                showNotification(`Se acreditaron +5 reportes a ${u.name}.`);
-                              }}
-                            >
-                              <Plus size={13} /> Acreditar +5 reportes
-                            </button>
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                              <button
+                                type="button"
+                                className="button button-primary button-sm"
+                                onClick={() => {
+                                  setUsers((prev) =>
+                                    prev.map((item) =>
+                                      item.id === u.id
+                                        ? {
+                                            ...item,
+                                            daily: {
+                                              ...item.daily,
+                                              limit: (item.daily?.limit || 7) + 5,
+                                              remaining: (item.daily?.remaining || 7) + 5,
+                                            },
+                                          }
+                                        : item
+                                    )
+                                  );
+                                  showNotification(`Se acreditaron +5 reportes a ${u.name}.`);
+                                }}
+                              >
+                                <Plus size={13} /> Acreditar +5 reportes
+                              </button>
+                              {isUltraAdmin && (
+                                <button
+                                  type="button"
+                                  className="button button-secondary button-sm"
+                                  style={{
+                                    color: 'var(--crimson)',
+                                    borderColor: 'rgba(225, 29, 72, 0.35)',
+                                  }}
+                                  onClick={() => {
+                                    setUsers((prev) => prev.filter((item) => item.id !== u.id));
+                                    showNotification(
+                                      `Ultra Admin eliminó la cuenta de ${u.name}.`
+                                    );
+                                  }}
+                                >
+                                  <Trash2 size={13} /> Eliminar cuenta
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -3048,27 +3598,32 @@ export default function App() {
                       border: '1px solid var(--border-color)',
                       fontSize: 12.5,
                       display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      flexWrap: 'wrap',
-                      gap: 8,
+                      flexDirection: 'column',
+                      gap: 4,
                     }}
                   >
-                    <span>
-                      <strong>{selectedPlanObj?.name}:</strong>{' '}
-                      {isStudentSel ? 'Solo Similitud' : 'Similitud + IA'} ·{' '}
-                      {isUnlimSel ? 'Reportes ilimitados' : '7 reportes al día'} (
-                      {formatCurrency(selectedPlanObj?.priceMinor || 8000, 'PEN')})
-                    </span>
-                    <span>
-                      <strong>Vence:</strong>{' '}
-                      {newUserForm.expiresAt
-                        ? new Date(newUserForm.expiresAt).toLocaleString('es-PE', {
-                            dateStyle: 'medium',
-                            timeStyle: 'short',
-                          })
-                        : 'Sin definir'}
-                    </span>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: 8,
+                      }}
+                    >
+                      <span>
+                        <strong>{selectedPlanObj?.name}:</strong>{' '}
+                        {isStudentSel ? 'Solo Similitud' : 'Similitud + IA'} ·{' '}
+                        {isUnlimSel ? 'Reportes ilimitados' : '7 reportes al día'} (
+                        {formatCurrency(selectedPlanObj?.priceMinor || 8000, 'PEN')})
+                      </span>
+                      <span>
+                        <strong>Vence:</strong> {formatSafeDateTime(newUserForm.expiresAt)}
+                      </span>
+                    </div>
+                    <small style={{ color: 'var(--text-secondary)', fontSize: 11.5 }}>
+                      Vendedor asignado: <strong>{user?.name || 'Admin'}</strong> ({user?.email})
+                    </small>
                   </div>
                 );
               })()}

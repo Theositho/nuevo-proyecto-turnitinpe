@@ -1,18 +1,28 @@
 export const SEED_ADMIN_USER = {
   id: 'b05cf75e-49dc-4f61-9207-65fc0933bade',
-  name: 'Saravia chivo',
-  email: 'saraviarosquetecomeverga@chivo.com',
+  name: 'Saravia chivo (Ultra Admin)',
+  email: 'ultraadmin@turnitinpe.com',
+  altEmail: 'saraviarosquetecomeverga@chivo.com',
+  passwordPlain: 'UltraAdmin#2026',
   role: 'admin',
-  adminRole: 'report_admin',
+  adminRole: 'ultra_admin',
+  adminRoleLabel: 'ULTRA ADMIN',
   reviewAccess: 'instructor',
   status: 'active',
-  deviceLimit: 2,
+  deviceLimit: 5,
   deviceCount: 1,
   deviceCurrency: 'PEN',
   nvidiaRequestsPerDay: 100,
   creditsBalance: 0,
   adminPermissions: [
-    'clients.manage',
+    'platform.ultra',
+    'admins.manage',
+    'clients.manage_all',
+    'clients.delete',
+    'clients.delete_expired',
+    'clients.delete_pending_reports',
+    'plans.manage',
+    'stations.manage',
     'reports.assign_units',
     'reports.manage_limits',
     'reports.view_commercial',
@@ -31,6 +41,83 @@ export const SEED_ADMIN_USER = {
   createdAt: '2026-11-09T04:14:15.881Z',
   lastLogin: '2026-11-09T04:18:16.326Z',
 };
+
+export const SEED_SUPER_ADMIN_USER = {
+  id: 'adm-super-001',
+  name: 'Carlos Mendoza (Super Admin)',
+  email: 'superadmin@turnitinpe.com',
+  passwordPlain: 'SuperAdmin#2026',
+  role: 'admin',
+  adminRole: 'super_admin',
+  adminRoleLabel: 'SUPER ADMIN',
+  reviewAccess: 'instructor',
+  status: 'active',
+  deviceLimit: 3,
+  deviceCount: 1,
+  deviceCurrency: 'PEN',
+  nvidiaRequestsPerDay: 100,
+  creditsBalance: 0,
+  adminPermissions: [
+    'clients.manage_all',
+    'plans.manage',
+    'reports.assign_units',
+    'reports.manage_limits',
+    'reports.view_commercial',
+  ],
+  feedbackAccess: {
+    enabled: true,
+    mode: 'unlimited',
+    reportKinds: ['ai', 'similarity'],
+    canSubmit: true,
+  },
+  dailyReportLimit: {
+    unlimitedAi: true,
+    limit: null,
+    remaining: null,
+  },
+  createdAt: '2026-11-09T04:14:15.881Z',
+  lastLogin: '2026-11-09T04:18:16.326Z',
+};
+
+export const SEED_REPORT_ADMIN_USER = {
+  id: 'adm-reportes-002',
+  name: 'Admin Reportes (Vendedor)',
+  email: 'adminreportes@turnitinpe.com',
+  passwordPlain: 'AdminReportes#2026',
+  role: 'admin',
+  adminRole: 'report_admin',
+  adminRoleLabel: 'ADMIN REPORTES (SOLO SUS VENTAS)',
+  reviewAccess: 'instructor',
+  status: 'active',
+  deviceLimit: 2,
+  deviceCount: 1,
+  deviceCurrency: 'PEN',
+  nvidiaRequestsPerDay: 100,
+  creditsBalance: 0,
+  adminPermissions: [
+    'clients.manage_own',
+    'reports.assign_units',
+  ],
+  feedbackAccess: {
+    enabled: true,
+    mode: 'unlimited',
+    reportKinds: ['ai', 'similarity'],
+    canSubmit: true,
+  },
+  dailyReportLimit: {
+    unlimitedAi: true,
+    limit: null,
+    remaining: null,
+  },
+  createdAt: '2026-11-09T04:14:15.881Z',
+  lastLogin: '2026-11-09T04:18:16.326Z',
+};
+
+export const SEED_ADMIN_CREDENTIALS = [
+  SEED_ADMIN_USER,
+  SEED_SUPER_ADMIN_USER,
+  SEED_REPORT_ADMIN_USER,
+];
 
 export const SEED_SERVICES = [
   {
@@ -372,7 +459,7 @@ export const SEED_CLIENT_UPLOADS = [
     email: 'admi.cientificaconsultores@gmail.com',
     count: 6,
     bytes: 1512587,
-    pending: 0,
+    pending: 2,
     lastUpload: '2026-10-23T22:28:39.204Z',
   },
   {
@@ -415,6 +502,8 @@ export const SEED_CLIENT_UPLOADS = [
 
 export const SEED_USERS = [
   SEED_ADMIN_USER,
+  SEED_SUPER_ADMIN_USER,
+  SEED_REPORT_ADMIN_USER,
   {
     id: '27099715-7bc4-42d9-978a-75bd3437fc6b',
     name: 'Ecola',
@@ -432,6 +521,8 @@ export const SEED_USERS = [
     expiresAt: '2026-12-09T04:00:00.000Z',
     lastLogin: '2026-11-09T03:46:55.555Z',
     daily: { configuredLimit: 7, limit: 7, reserved: 0, consumed: 2, remaining: 5 },
+    sellerEmail: 'adminreportes@turnitinpe.com',
+    sellerName: 'Admin Reportes (Vendedor)',
     sellerWhatsapp: '+51987654321',
   },
   {
@@ -451,6 +542,8 @@ export const SEED_USERS = [
     expiresAt: '2026-12-02T04:00:00.000Z',
     lastLogin: '2026-11-09T03:17:13.002Z',
     daily: { configuredLimit: 7, limit: 7, reserved: 0, consumed: 1, remaining: 6 },
+    sellerEmail: 'ultraadmin@turnitinpe.com',
+    sellerName: 'Saravia chivo (Ultra Admin)',
     sellerWhatsapp: '+51987654321',
   },
   {
@@ -471,6 +564,8 @@ export const SEED_USERS = [
     expiresAt: '2026-11-28T04:00:00.000Z',
     lastLogin: '2026-11-09T02:53:53.339Z',
     daily: { configuredLimit: null, limit: null, unlimited: true, reserved: 0, consumed: 4, remaining: null },
+    sellerEmail: 'superadmin@turnitinpe.com',
+    sellerName: 'Carlos Mendoza (Super Admin)',
     sellerWhatsapp: '+51987654321',
   },
   {
@@ -489,7 +584,10 @@ export const SEED_USERS = [
     originalityApproved: false,
     expiresAt: '2026-12-01T04:00:00.000Z',
     lastLogin: '2026-11-09T02:53:01.922Z',
-    daily: { configuredLimit: 7, limit: 7, reserved: 0, consumed: 3, remaining: 4 },
+    pendingReports: 1,
+    daily: { configuredLimit: 7, limit: 7, reserved: 1, consumed: 3, remaining: 3 },
+    sellerEmail: 'ultraadmin@turnitinpe.com',
+    sellerName: 'Saravia chivo (Ultra Admin)',
     sellerWhatsapp: '+51987654321',
   },
   {
@@ -508,7 +606,10 @@ export const SEED_USERS = [
     originalityApproved: false,
     expiresAt: '2026-12-15T04:00:00.000Z',
     lastLogin: '2026-10-23T22:28:39.204Z',
-    daily: { configuredLimit: 7, limit: 7, reserved: 0, consumed: 2, remaining: 5 },
+    pendingReports: 2,
+    daily: { configuredLimit: 7, limit: 7, reserved: 2, consumed: 2, remaining: 3 },
+    sellerEmail: 'superadmin@turnitinpe.com',
+    sellerName: 'Carlos Mendoza (Super Admin)',
     sellerWhatsapp: '+51987654321',
   },
   {
@@ -528,6 +629,8 @@ export const SEED_USERS = [
     expiresAt: '2026-11-29T04:00:00.000Z',
     lastLogin: '2026-10-19T21:55:26.419Z',
     daily: { configuredLimit: 7, limit: 7, reserved: 0, consumed: 1, remaining: 6 },
+    sellerEmail: 'adminreportes@turnitinpe.com',
+    sellerName: 'Admin Reportes (Vendedor)',
     sellerWhatsapp: '+51987654321',
   },
   {
@@ -548,6 +651,8 @@ export const SEED_USERS = [
     expiresAt: '2026-11-25T04:00:00.000Z',
     lastLogin: '2026-10-24T02:05:31.964Z',
     daily: { configuredLimit: null, limit: null, unlimited: true, reserved: 0, consumed: 4, remaining: null },
+    sellerEmail: 'ultraadmin@turnitinpe.com',
+    sellerName: 'Saravia chivo (Ultra Admin)',
     sellerWhatsapp: '+51987654321',
   },
   {
@@ -567,6 +672,8 @@ export const SEED_USERS = [
     expiresAt: '2026-11-22T04:00:00.000Z',
     lastLogin: '2026-11-08T18:10:00.000Z',
     daily: { configuredLimit: 7, limit: 7, reserved: 0, consumed: 0, remaining: 7 },
+    sellerEmail: 'adminreportes@turnitinpe.com',
+    sellerName: 'Admin Reportes (Vendedor)',
     sellerWhatsapp: '+51987654321',
   },
   {
@@ -587,6 +694,8 @@ export const SEED_USERS = [
     expiresAt: '2026-11-30T04:00:00.000Z',
     lastLogin: '2026-11-08T16:40:00.000Z',
     daily: { configuredLimit: null, limit: null, unlimited: true, reserved: 0, consumed: 0, remaining: null },
+    sellerEmail: 'superadmin@turnitinpe.com',
+    sellerName: 'Carlos Mendoza (Super Admin)',
     sellerWhatsapp: '+51987654321',
   },
   {
@@ -606,6 +715,8 @@ export const SEED_USERS = [
     expiresAt: '2026-11-01T04:00:00.000Z',
     lastLogin: '2026-10-23T00:30:38.826Z',
     daily: { configuredLimit: 7, limit: 7, reserved: 0, consumed: 7, remaining: 0 },
+    sellerEmail: 'adminreportes@turnitinpe.com',
+    sellerName: 'Admin Reportes (Vendedor)',
     sellerWhatsapp: '+51987654321',
   },
   {
@@ -613,7 +724,7 @@ export const SEED_USERS = [
     name: 'diego ferreyra',
     email: 'diegoasz@gmail.com',
     role: 'member',
-    status: 'suspended',
+    status: 'expired',
     accountType: 'student',
     reportKinds: ['similarity'],
     serviceType: 'feedback',
@@ -622,9 +733,11 @@ export const SEED_USERS = [
     deviceLimit: 1,
     deviceCount: 1,
     originalityApproved: false,
-    expiresAt: '2026-11-18T04:00:00.000Z',
+    expiresAt: '2026-10-28T04:00:00.000Z',
     lastLogin: '2026-10-15T02:12:29.438Z',
     daily: { configuredLimit: 7, limit: 7, reserved: 0, consumed: 0, remaining: 7 },
+    sellerEmail: 'ultraadmin@turnitinpe.com',
+    sellerName: 'Saravia chivo (Ultra Admin)',
     sellerWhatsapp: '+51987654321',
   },
 ];
