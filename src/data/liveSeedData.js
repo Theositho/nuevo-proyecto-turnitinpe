@@ -166,6 +166,15 @@ export const SEED_SERVICES = [
     operationalDetail: 'Configuración verificada · 100 consultas diarias.',
   },
   {
+    id: 'ithenticate',
+    name: 'iThenticate',
+    provider: 'custom',
+    description: 'Generador de código 2FA exclusivo para http://www.rmit.edu.au/iThenticate.',
+    available: true,
+    operationalState: 'receiving',
+    operationalDetail: 'Generador dinámico de códigos de verificación RMIT activo.',
+  },
+  {
     id: 'quillbot',
     name: 'QuillBot',
     provider: 'custom',

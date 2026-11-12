@@ -3,7 +3,8 @@ import path from 'node:path';
 import { build } from 'vite';
 import react from '@vitejs/plugin-react';
 
-const ARTIFACT_PATH = '/home/antigravity/.gemini/jetski/brain/v1/default/jetski_remote_agents_3p/5f7323c2-b318-4ab3-9214-37702e9eadbf/TurnitinPE-v2.html';
+const ARTIFACT_PATH = '/home/antigravity/.gemini/jetski/brain/v1/default/jetski_remote_agents_3p/ea6c2230-3f32-47d4-a192-20e7d627048a/TurnitinPE-v2.html';
+const OLD_ARTIFACT_PATH = '/home/antigravity/.gemini/jetski/brain/v1/default/jetski_remote_agents_3p/5f7323c2-b318-4ab3-9214-37702e9eadbf/TurnitinPE-v2.html';
 const REPO_STANDALONE = '/home/antigravity/Theositho/nuevo-proyecto-turnitinpe/TurnitinPE-Standalone.html';
 const WEB_STANDALONE = '/home/antigravity/Theositho/turnitinpe-v2-web/TurnitinPE-Standalone.html';
 
@@ -81,10 +82,19 @@ if (fs.existsSync('/home/antigravity/Theositho/turnitinpe-v2-web')) {
 }
 
 try {
+  fs.mkdirSync(path.dirname(ARTIFACT_PATH), { recursive: true });
   fs.writeFileSync(ARTIFACT_PATH, standaloneHtml, 'utf-8');
   console.log('✓ Wrote to artifact', ARTIFACT_PATH);
 } catch (e) {
   console.warn('Artifact write skipped or failed:', e.message);
+}
+
+try {
+  if (fs.existsSync(path.dirname(OLD_ARTIFACT_PATH))) {
+    fs.writeFileSync(OLD_ARTIFACT_PATH, standaloneHtml, 'utf-8');
+  }
+} catch (e) {
+  // ignore
 }
 
 console.log('🎉 Standalone build completed successfully!');

@@ -5,6 +5,7 @@ import {
   SEED_ADMIN_CREDENTIALS,
   SEED_USERS,
   SEED_JOBS,
+  SEED_SERVICES,
 } from './src/data/liveSeedData.js';
 
 let passed = 0;
@@ -302,7 +303,38 @@ assert(
   'Admin Reportes NO puede eliminar cuentas'
 );
 
-// 7. RESUMEN FINAL
+// 7. VERIFICACIÓN DE ITHENTICATE Y AVISO DE CARÁTULA
+console.log('\n📌 7. Verificación de Generador iThenticate y Aviso Sin Carátula:');
+
+const ithenticateSvc = SEED_SERVICES.find((s) => s.id === 'ithenticate');
+assert(
+  !!ithenticateSvc && ithenticateSvc.name === 'iThenticate',
+  'Servicio iThenticate registrado correctamente en SEED_SERVICES'
+);
+
+assert(
+  ithenticateSvc.description.includes('http://www.rmit.edu.au/iThenticate'),
+  'Servicio iThenticate vinculado exclusivamente a http://www.rmit.edu.au/iThenticate'
+);
+
+const appCode = fs.readFileSync('./src/App.jsx', 'utf-8');
+assert(
+  appCode.includes('EL DOCUMENTO DEBE SER SUBIDO SIN CARÁTULA DE UNIVERSIDAD'),
+  'Aviso grande y destacado "SIN CARÁTULA DE UNIVERSIDAD" presente antes de subir reportes'
+);
+
+assert(
+  appCode.includes("activeTab === 'ithenticate'") && appCode.includes('<IthenticateGenerator'),
+  'Pestaña iThenticate con componente IthenticateGenerator integrada en la navegación'
+);
+
+const ithenticateCode = fs.readFileSync('./src/components/IthenticateGenerator.jsx', 'utf-8');
+assert(
+  ithenticateCode.includes('http://www.rmit.edu.au/iThenticate'),
+  'Componente IthenticateGenerator incluye enlace directo a http://www.rmit.edu.au/iThenticate'
+);
+
+// 8. RESUMEN FINAL
 console.log('\n====================================================');
 console.log(`📊 RESULTADO DE LAS PRUEBAS: ${passed} PASADAS, ${failed} FALLADAS`);
 console.log('====================================================');
@@ -310,6 +342,6 @@ console.log('====================================================');
 if (failed > 0) {
   process.exit(1);
 } else {
-  console.log('🎉 TODAS LAS VERIFICACIONES (30/30) HAN SIDO SATISFACTORIAS.');
+  console.log('🎉 TODAS LAS VERIFICACIONES HAN SIDO SATISFACTORIAS.');
 }
 

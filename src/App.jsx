@@ -35,6 +35,8 @@ import {
   Calendar,
   Clock,
   Globe,
+  AlertTriangle,
+  ShieldAlert,
 } from 'lucide-react';
 import {
   SEED_ADMIN_USER,
@@ -52,6 +54,7 @@ import {
 } from './data/liveSeedData';
 import ReportViewerModal from './components/ReportViewerModal';
 import Landing from './components/Landing';
+import IthenticateGenerator from './components/IthenticateGenerator';
 
 function formatCurrency(minor, currency = 'PEN') {
   return new Intl.NumberFormat('es-PE', {
@@ -1076,6 +1079,12 @@ export default function App() {
     {
       label: 'SERVICIOS COMPLEMENTARIOS',
       items: [
+        {
+          id: 'ithenticate',
+          label: 'iThenticate',
+          icon: KeyRound,
+          proBadge: 'RMIT',
+        },
         { id: 'quillbot', label: 'QuillBot', icon: QuillbotIcon },
         ...(!isStudentAccount
           ? [{ id: 'nvidia', label: 'Todas las IA', icon: Sparkles }]
@@ -1130,6 +1139,12 @@ export default function App() {
       subtitle: isStudentAccount
         ? 'Analiza documentos PDF con reportes ilimitados de Similitud sin indexación en repositorio.'
         : 'Analiza documentos PDF con reportes ilimitados de IA y Similitud sin indexación en repositorio.',
+    },
+    ithenticate: {
+      eyebrow: 'GENERADOR DE CÓDIGO EXCLUSIVO',
+      title: 'iThenticate · Generador de Código RMIT',
+      subtitle:
+        'Generador de código dinámico de verificación en dos pasos (2FA / TOTP) exclusivo para http://www.rmit.edu.au/iThenticate.',
     },
     quillbot: {
       eyebrow: 'APOYO A LA REDACCIÓN',
@@ -1495,6 +1510,7 @@ export default function App() {
             <div>
               <span className="page-eyebrow">{pageMeta.eyebrow}</span>
               <h1 style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {activeTab === 'ithenticate' && <KeyRound size={28} style={{ color: 'var(--brand-primary)' }} />}
                 {activeTab === 'quillbot' && <QuillbotIcon size={28} />}
                 <span>{pageMeta.title}</span>
               </h1>
@@ -2015,6 +2031,9 @@ export default function App() {
                         >
                           <div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              {svc.id === 'ithenticate' && (
+                                <KeyRound size={18} style={{ color: 'var(--brand-primary)' }} />
+                              )}
                               {svc.id === 'quillbot' && <QuillbotIcon size={20} />}
                               <strong>{svc.name}</strong>
                               <span className="status-pill status-emerald">Recepción activa</span>
@@ -2113,6 +2132,88 @@ export default function App() {
                   </span>
                 </div>
 
+                {/* AVISO GRANDE Y DESTACADO: REQUISITO SIN CARÁTULA DE UNIVERSIDAD */}
+                <div
+                  style={{
+                    margin: '6px 0 18px',
+                    padding: '16px 20px',
+                    borderRadius: 14,
+                    background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.14) 0%, rgba(245, 158, 11, 0.10) 100%)',
+                    border: '2px solid rgba(239, 68, 68, 0.45)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 16,
+                    boxShadow: '0 4px 18px rgba(239, 68, 68, 0.10)',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 50,
+                      height: 50,
+                      borderRadius: 14,
+                      background: 'rgba(239, 68, 68, 0.18)',
+                      color: '#ef4444',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      border: '1.5px solid rgba(239, 68, 68, 0.35)',
+                    }}
+                  >
+                    <AlertTriangle size={30} strokeWidth={2.4} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: 8,
+                        marginBottom: 4,
+                      }}
+                    >
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 5,
+                          background: '#ef4444',
+                          color: '#ffffff',
+                          fontSize: 11.5,
+                          fontWeight: 800,
+                          padding: '3px 9px',
+                          borderRadius: 6,
+                          letterSpacing: '0.04em',
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        <ShieldAlert size={12} /> REQUISITO OBLIGATORIO
+                      </span>
+                      <h3
+                        style={{
+                          margin: 0,
+                          fontSize: 16.5,
+                          fontWeight: 800,
+                          color: 'var(--text-primary)',
+                          letterSpacing: '-0.01em',
+                        }}
+                      >
+                        EL DOCUMENTO DEBE SER SUBIDO SIN CARÁTULA DE UNIVERSIDAD
+                      </h3>
+                    </div>
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: 13.5,
+                        color: 'var(--text-secondary)',
+                        lineHeight: 1.45,
+                      }}
+                    >
+                      Por favor retira la carátula institucional, membretes y logos antes de subir tu archivo PDF. Subir carátulas de universidad incrementa falsos positivos de similitud por nombres y formatos institucionales comunes.
+                    </p>
+                  </div>
+                </div>
+
                 <form
                   onSubmit={handleFileUploadSubmit}
                   style={{ display: 'flex', flexDirection: 'column', gap: 16 }}
@@ -2158,6 +2259,24 @@ export default function App() {
                     >
                       PDF · Máximo 100 MB por archivo
                     </small>
+
+                    <div
+                      style={{
+                        marginTop: 10,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        padding: '4px 12px',
+                        borderRadius: 20,
+                        background: 'rgba(239, 68, 68, 0.1)',
+                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                        color: '#ef4444',
+                        fontSize: 12.5,
+                        fontWeight: 700,
+                      }}
+                    >
+                      <AlertTriangle size={14} /> Recuerda: Subir únicamente documentos sin carátula institucional
+                    </div>
                   </div>
 
                   {/* Exact fields: Título, Autor, Tipo de informe */}
@@ -2624,6 +2743,16 @@ export default function App() {
                 </form>
               </section>
             </div>
+          )}
+
+          {/* ==========================================
+              TAB: ITHENTICATE GENERATOR
+             ========================================== */}
+          {activeTab === 'ithenticate' && (
+            <IthenticateGenerator
+              showNotification={showNotification}
+              isAdmin={isAdminView}
+            />
           )}
 
           {/* ==========================================
